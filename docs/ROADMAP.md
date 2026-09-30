@@ -1,84 +1,559 @@
 # EdgeFlags Roadmap
 
-This roadmap intentionally stays at iteration level.
+This document is the canonical implementation roadmap for EdgeFlags. It defines
+the order, scope, and observable outcome of each phase. The
+[README](../README.md) provides only a summary and must not maintain a separate
+phase list.
 
-Each phase should be planned in detail locally before implementation. The purpose here is only to define the order of work and the outcome expected from each iteration.
+EdgeFlags is currently in **Phase 1 planning**. No implementation phase has been
+completed.
 
-## Phase 1 — Project bootstrap
+## Planning model
 
-TypeScript Cloudflare Worker, Wrangler, mise, Biome, Vitest, and the initial repository structure.
+- Each phase maps to one GitHub milestone.
+- Milestone issues represent reviewable units of work, not the whole phase.
+- Only the active phase and, when useful, the next phase are decomposed in
+  detail. Later phases remain outcome-oriented until their prerequisites exist.
+- An issue should normally be small enough to produce one focused pull request.
+- Significant decisions discovered during implementation are recorded as ADRs.
+- Experiments follow the process in [EXPERIMENTS.md](EXPERIMENTS.md).
 
-## Phase 2 — Core feature flags
+The roadmap can change when implementation reveals a false assumption, provider
+limitation, or better learning sequence. Such changes must update this document
+rather than creating a second plan elsewhere.
 
-Boolean flag CRUD and evaluation with a minimal local implementation and tests.
+## Phase 1 - Project bootstrap
 
-## Phase 3 — Cloudflare KV
+### Objective
 
-Replace the temporary storage with Cloudflare KV and validate local/deployed Worker behavior.
+Establish a runnable and testable TypeScript Cloudflare Worker with a reproducible
+developer toolchain.
 
-## Phase 4 — Terraform foundation
+### Deliverables
 
-Provision the initial Cloudflare resources with Terraform and make the infrastructure reproducible from code.
+- Initial `app/` structure and minimal Worker entry point.
+- TypeScript and Wrangler configuration.
+- A selected JavaScript package manager and committed lockfile.
+- mise-managed tool versions and development tasks.
+- Biome formatting and linting.
+- Vitest configuration and bootstrap tests.
 
-## Phase 5 — Terragrunt and environments
+### Completion criteria
 
-Introduce Terragrunt, shared configuration, and separate `dev` and `prod` environments while keeping the default deployment inside free tiers.
+From a clean clone, the documented setup installs the pinned tools and the shared
+tasks can start, format, lint, type-check, and test a minimal local Worker.
 
-## Phase 6 — Continuous integration
+### Dependencies
 
-Add GitHub Actions for formatting, linting, type checking, tests, security checks, Terraform validation, and infrastructure plans on pull requests.
+None.
 
-## Phase 7 — Continuous deployment
+### Explicitly out of scope
 
-Automate infrastructure apply, Worker deployment, and post-deployment smoke tests from `main`.
+Feature flag behavior, KV persistence, cloud infrastructure, and CI.
 
-## Phase 8 — API security
+## Phase 2 - Core feature flags
 
-Introduce API keys, credential hashing, client identification, scopes, secret handling, key rotation, and revocation.
+### Objective
 
-## Phase 9 — Abuse protection
+Implement the smallest useful feature flag service without depending on remote
+storage.
 
-Add rate limiting, `429` behavior, audit events, and the first abuse-oriented tests.
+### Deliverables
 
-## Phase 10 — Advanced flag evaluation
+- Boolean feature flag model and validation rules.
+- Temporary local or in-memory storage boundary.
+- Create or replace, read, delete, and evaluate operations.
+- Initial HTTP request, response, status-code, and error contracts.
+- Unit and Worker integration tests for the supported behavior.
 
-Add deterministic percentage rollouts, evaluation context, targeting rules, environments, and typed flag values.
+### Completion criteria
 
-## Phase 11 — OpenFeature interoperability
+A local Worker can create, read, delete, and evaluate a boolean flag through the
+documented API, with automated tests covering success and failure behavior.
 
-Evaluate and implement the appropriate OpenFeature integration, including OFREP if it fits the resulting architecture.
+### Dependencies
 
-## Phase 12 — Observability
+Phase 1.
 
-Integrate Grafana Cloud Free through a free-tier-compatible telemetry path and add structured logs, traces, metrics where feasible, and initial dashboards.
+### Explicitly out of scope
 
-## Phase 13 — SRE
+Cloudflare KV, authentication, rollouts, targeting, and multiple environments.
 
-Define SLIs, SLOs, error budgets, burn-rate concepts, dashboards, and alerts using the observability stack built in the previous phase.
+## Phase 3 - Cloudflare KV integration
 
-## Phase 14 — Load and failure testing
+### Objective
 
-Add k6 scenarios, traffic spikes, rate-limit exhaustion, injected latency, injected failures, and correlate the results with Grafana.
+Replace temporary storage with a Cloudflare KV adapter while preserving the core
+application behavior.
 
-## Phase 15 — Distributed-system experiments
+### Deliverables
 
-Measure KV propagation delay, stale reads, consistency trade-offs, and document when KV is or is not an appropriate feature-flag store.
+- Versioned persisted flag representation.
+- KV binding and storage adapter.
+- Local integration tests using the selected Workers testing tooling.
+- Documented consistency expectations and remote-validation procedure.
+- Separation between feature flag behavior and Cloudflare storage APIs.
 
-## Phase 16 — Hardening and automation
+### Completion criteria
 
-Add or finalize Trivy, TFLint, dependency update automation, security scanning, repository hygiene, and repeatable maintenance workflows.
+The Worker uses the KV binding in local development and integration tests. The
+same core behavior remains testable without KV, and the remote checks to run once
+infrastructure exists are documented.
 
-## Phase 17 — Documentation and retrospective
+### Dependencies
 
-Consolidate ADRs, document free-tier trade-offs and experiment findings, update the architecture, and record what would change for a production-grade implementation.
+Phase 2.
+
+### Explicitly out of scope
+
+Reproducible cloud provisioning, multi-environment keys, and propagation-delay
+measurements across locations. Remote validation completes in Phases 4 and 15.
+
+## Phase 4 - Terraform foundation
+
+### Objective
+
+Provision the initial Cloudflare resources reproducibly with Terraform and prove
+that the KV-backed Worker can use them.
+
+### Deliverables
+
+- Terraform provider and version constraints.
+- Initial reusable modules for required Cloudflare resources.
+- Variables, outputs, and non-secret configuration documentation.
+- State and credential handling appropriate for the learning environment.
+- Formatting and validation tasks.
+- Remote validation of the KV binding created from code.
+
+### Completion criteria
+
+The initial development resources can be created from the documented Terraform
+workflow, validated, used by the Worker, and destroyed without undocumented
+console steps.
+
+### Dependencies
+
+Phase 3 and access to a suitable Cloudflare account.
+
+### Explicitly out of scope
+
+Terragrunt composition, production infrastructure, and automated deployment.
+
+## Phase 5 - Terragrunt and environments
+
+### Objective
+
+Introduce shared infrastructure composition and distinct `dev` and `prod`
+configurations without duplicating Terraform modules.
+
+### Deliverables
+
+- Terragrunt configuration and pinned version.
+- Shared configuration for account, region-independent resources, and state.
+- Separate `dev` and `prod` environment inputs.
+- Environment-specific validation and plan tasks.
+- Documented free-tier resource inventory.
+
+### Completion criteria
+
+The development environment can be recreated through Terragrunt, the production
+configuration produces a reviewable plan, and both default configurations are
+shown to fit the selected free tiers.
+
+### Dependencies
+
+Phase 4.
+
+### Explicitly out of scope
+
+Automatic apply, Worker deployment from GitHub, and environment-specific feature
+flag behavior inside the application.
+
+## Phase 6 - Continuous integration
+
+### Objective
+
+Run the same application and infrastructure validation in GitHub Actions that a
+developer can run locally.
+
+### Deliverables
+
+- Pull request workflows for application checks.
+- Terraform and Terragrunt formatting, validation, and plans where applicable.
+- Initial dependency or security checks that are stable enough to gate changes.
+- Caching that does not compromise reproducibility.
+- Least-privilege workflow permissions and documented required secrets.
+
+### Completion criteria
+
+A pull request into `develop` reports formatting, linting, type-checking, tests,
+and applicable infrastructure validation without requiring undocumented manual
+steps. Infrastructure plans are reviewable and do not expose secrets.
+
+### Dependencies
+
+Phases 1 through 5.
+
+### Explicitly out of scope
+
+Infrastructure apply, Worker deployment, production promotion, and smoke tests
+against a newly deployed release.
+
+## Phase 7 - Continuous deployment
+
+### Objective
+
+Automate controlled environment deployment and verify each deployment through a
+small smoke-test suite.
+
+### Deliverables
+
+- A documented deployment trigger for the `dev` environment.
+- Production deployment after promotion from `develop` to `main`.
+- Infrastructure apply and Worker deployment ordering.
+- Post-deployment smoke tests.
+- GitHub environment protections and deployment credentials where supported.
+- Documented failure and rollback procedure.
+
+### Completion criteria
+
+A successful promotion to `main` deploys the intended production configuration
+and Worker, then verifies a known flag through smoke tests. Failed validation or
+deployment produces an actionable failure and a documented recovery path.
+
+### Dependencies
+
+Phase 6.
+
+### Explicitly out of scope
+
+Progressive delivery, production-grade high availability, and complex rollback
+orchestration.
+
+## Phase 8 - API security
+
+### Objective
+
+Authenticate API clients and authorize operations without storing reusable
+credentials in plaintext.
+
+### Deliverables
+
+- API key issuance and request authentication.
+- Credential hashing or another justified non-plaintext verification design.
+- Stable client identity and scope definitions.
+- Authorization rules for management and evaluation operations.
+- Secret storage and deployment integration.
+- Key rotation and revocation procedures.
+- Security-focused unit and integration tests.
+
+### Completion criteria
+
+Protected operations reject missing, invalid, revoked, and insufficiently scoped
+credentials. Valid keys can be rotated without interrupting clients that have
+already adopted the replacement key.
+
+### Dependencies
+
+Phases 2, 3, and 7.
+
+### Explicitly out of scope
+
+User accounts, OAuth/OIDC, production identity management, and request rate
+limiting.
+
+## Phase 9 - Abuse protection
+
+### Objective
+
+Limit abusive request patterns and make denial behavior predictable and
+observable.
+
+### Deliverables
+
+- A free-tier-compatible rate-limiting design.
+- Limits by authenticated client or IP where feasible.
+- Stable `429` response semantics.
+- Security-relevant audit events.
+- Tests for exhaustion, recovery, and separation between clients.
+
+### Completion criteria
+
+A repeatable test can exhaust a configured limit, observe the expected `429`
+behavior and recovery window, and correlate the denial with an audit signal.
+
+### Dependencies
+
+Phase 8 and revalidation of current Cloudflare plan capabilities.
+
+### Explicitly out of scope
+
+Advanced bot management, DDoS guarantees, and load-capacity analysis.
+
+## Phase 10 - Advanced flag evaluation
+
+### Objective
+
+Evolve boolean evaluation into deterministic, context-aware flag resolution.
+
+### Deliverables
+
+- Percentage rollout model and boundary behavior.
+- Stable deterministic subject assignment.
+- Evaluation context and targeting rules.
+- Application-level environment support.
+- Typed flag values and resolution details where justified.
+- Compatibility and migration rules for existing persisted flags.
+
+### Completion criteria
+
+Automated tests prove deterministic assignment, rollout boundaries, context
+matching, environment isolation, typed value behavior, and compatibility with
+flags created by earlier phases.
+
+### Dependencies
+
+Phases 2, 3, and 8.
+
+### Explicitly out of scope
+
+A graphical rule editor, arbitrary scripting, and OpenFeature protocol support.
+
+## Phase 11 - OpenFeature interoperability
+
+### Objective
+
+Determine and implement the smallest useful OpenFeature integration without
+coupling the base EdgeFlags API to a single client ecosystem.
+
+### Deliverables
+
+- Compatibility analysis against the implemented evaluation model.
+- A documented decision covering provider and OFREP alternatives.
+- The selected provider, OFREP boundary, or another justified integration.
+- Interoperability tests and client example.
+- Documented unsupported OpenFeature capabilities.
+
+### Completion criteria
+
+A documented client can evaluate supported EdgeFlags values through the selected
+OpenFeature-compatible boundary, or the phase records evidence explaining why
+implementation is not appropriate.
+
+### Dependencies
+
+Phase 10.
+
+### Explicitly out of scope
+
+Claiming full specification conformance without conformance evidence or adding
+features solely to mirror another platform.
+
+## Phase 12 - Observability
+
+### Objective
+
+Select a free-tier-compatible telemetry path and make important request and
+evaluation behavior diagnosable.
+
+### Deliverables
+
+- Current Cloudflare and telemetry-provider capability assessment.
+- Structured application logs with safe contextual fields.
+- Trace propagation and spans where the selected path supports them.
+- A documented application metrics strategy.
+- Grafana Cloud integration and dashboards if the validated path supports them.
+- Redaction, sampling, retention, and cost considerations.
+
+### Completion criteria
+
+A documented request can be followed through the signals available in the
+selected free-tier design. Missing signal types and provider limitations are
+explicitly documented rather than simulated or promised.
+
+### Dependencies
+
+Phases 7 through 9 and a fresh validation of provider pricing and capabilities.
+
+### Explicitly out of scope
+
+Paid telemetry as a default requirement and unsupported claims of complete
+metrics, logs, or trace coverage.
+
+## Phase 13 - SRE
+
+### Objective
+
+Turn available telemetry into explicit reliability indicators, objectives, and
+actionable failure signals.
+
+### Deliverables
+
+- Availability and latency SLIs.
+- Initial SLOs with rationale.
+- Error budget calculation and interpretation.
+- Burn-rate queries or equivalent analysis.
+- Dashboards and alerts where supported by the selected stack.
+- Runbook notes for each actionable alert.
+
+### Completion criteria
+
+Recorded traffic changes the defined SLIs and error budget in a measurable way,
+and at least one controlled degradation can exercise the alerting or documented
+manual detection path.
+
+### Dependencies
+
+Phase 12.
+
+### Explicitly out of scope
+
+Production reliability guarantees, an on-call program, and arbitrary objectives
+that cannot be measured with the available signals.
+
+## Phase 14 - Load and failure testing
+
+### Objective
+
+Generate controlled traffic and failures, then correlate system behavior with
+the observability and SRE model.
+
+### Deliverables
+
+- Pinned k6 tooling and shared tasks.
+- Baseline evaluation workload.
+- Traffic spike and concurrent-client scenarios.
+- Rate-limit exhaustion scenario.
+- Controlled latency and evaluation failure injection.
+- Recorded observations linked to dashboards, traces, logs, or SLI changes.
+
+### Completion criteria
+
+The documented scenarios are repeatable, protect the free-tier environment from
+accidental excessive load, and produce interpretable changes in the selected
+operational signals.
+
+### Dependencies
+
+Phases 9, 12, and 13.
+
+### Explicitly out of scope
+
+Capacity certification, destructive testing against production, and performance
+claims beyond the measured configuration.
+
+## Phase 15 - Distributed-system experiments
+
+### Objective
+
+Measure Cloudflare KV consistency behavior and determine the feature flag use
+cases for which it is or is not appropriate.
+
+### Deliverables
+
+- KV propagation-delay experiment.
+- Cross-location stale-read experiment where practical.
+- Comparison of local and deployed assumptions.
+- Analysis of acceptable and unacceptable stale evaluation scenarios.
+- Documented alternatives when stronger consistency is required.
+
+### Completion criteria
+
+Experiment records contain repeatable procedures, measurements, limitations, and
+a conclusion about KV suitability. Findings update the architecture or create an
+ADR when they challenge an existing decision.
+
+### Dependencies
+
+Phases 3, 7, 12, and 14.
+
+### Explicitly out of scope
+
+Eliminating eventual consistency or generalizing limited measurements into
+global service guarantees.
+
+## Phase 16 - Hardening and automation
+
+### Objective
+
+Close tooling and maintenance gaps discovered during implementation without
+adding checks that have no owner or response process.
+
+### Deliverables
+
+- Finalized Trivy and TFLint integration where useful.
+- Dependency update automation.
+- Repository and workflow security review.
+- Pinned actions, tools, and infrastructure providers.
+- Repeatable maintenance and upgrade tasks.
+- Removal or documentation of obsolete configuration.
+
+### Completion criteria
+
+Security and maintenance checks run through documented local or CI workflows,
+produce actionable results, and have an explicit update or exception process.
+
+### Dependencies
+
+All tooling and deployment phases whose artifacts are being hardened.
+
+### Explicitly out of scope
+
+Adding scanners only for checklist coverage or promising remediation of risks
+outside the learning project's stated scope.
+
+## Phase 17 - Documentation and retrospective
+
+### Objective
+
+Reconcile the original design with the implemented system and preserve the
+technical and learning outcomes.
+
+### Deliverables
+
+- Current architecture and developer workflow documentation.
+- Consolidated ADR index and decision statuses.
+- Free-tier cost and capability findings.
+- Experiment index and consistency conclusions.
+- Production-readiness gap analysis.
+- Retrospective covering successful and unsuccessful choices.
+
+### Completion criteria
+
+A new reader can reproduce the implemented project, distinguish demonstrated
+behavior from assumptions, understand major decisions and experiments, and see
+what would need to change for production use.
+
+### Dependencies
+
+All completed implementation and experiment phases.
+
+### Explicitly out of scope
+
+Reframing the learning project as a production-ready service.
 
 ## Continuous concerns
 
-These are not standalone phases and should be addressed whenever a decision warrants them:
+These concerns are addressed whenever a phase makes them relevant rather than
+being deferred to a final cleanup:
 
-- Architecture Decision Records
-- Free-tier constraints
-- Testing
-- Security
-- Documentation
-- Reproducibility through mise and IaC
+- testing at the boundary appropriate to the risk,
+- free-tier and provider-limit validation,
+- security and secret handling,
+- documentation of current and target behavior,
+- reproducibility through mise and infrastructure as code,
+- ADRs for decisions with meaningful trade-offs, and
+- experiment evidence for empirical claims.
+
+## Phase definition of done
+
+A phase is complete when:
+
+- its completion criterion has been demonstrated,
+- its deliverables are reviewed and merged,
+- applicable automated validation passes,
+- user-facing commands and behavior are documented,
+- secrets and free-tier constraints have been considered,
+- relevant ADRs and experiments are recorded, and
+- deferred work is explicit rather than hidden in an unchecked implementation
+  detail.
