@@ -5,8 +5,7 @@ the order, scope, and observable outcome of each phase. The
 [README](../README.md) provides only a summary and must not maintain a separate
 phase list.
 
-EdgeFlags is currently in **Phase 1 planning**. No implementation phase has been
-completed.
+EdgeFlags has completed **Phase 1** and is ready for Phase 2 planning.
 
 ## Planning model
 
@@ -23,6 +22,8 @@ limitation, or better learning sequence. Such changes must update this document
 rather than creating a second plan elsewhere.
 
 ## Phase 1 - Project bootstrap
+
+**Status:** Completed on 2026-09-30.
 
 ### Objective
 
@@ -64,6 +65,9 @@ storage.
 - Temporary local or in-memory storage boundary.
 - Create or replace, read, delete, and evaluate operations.
 - Initial HTTP request, response, status-code, and error contracts.
+- Architecture-boundary configuration based on the implemented layers, enforced
+  locally and through the shared checks with
+  `@jfrz38/clean-architecture-highlighter-cli`.
 - Unit and Worker integration tests for the supported behavior.
 
 ### Completion criteria

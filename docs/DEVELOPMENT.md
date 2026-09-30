@@ -1,8 +1,8 @@
 # EdgeFlags Development
 
-This document defines the target developer experience. EdgeFlags has not reached
-the bootstrap phase yet, so the commands and application paths below are not
-available unless explicitly marked otherwise.
+This document defines the developer experience. Phase 1 established the
+application workflow; infrastructure and operational commands remain target
+outcomes for later phases.
 
 ## Goals
 
@@ -60,8 +60,11 @@ bootstrap. Directories should be added by the phase that gives them a purpose.
 | Runtime | TypeScript on Cloudflare Workers | Phase 1 |
 | Local Worker development | Wrangler | Phase 1 |
 | Tool versions and tasks | mise | Phase 1 |
+| Operational task interface | GNU Make | Phase 1 |
+| Local Git hooks | Husky | Phase 1 |
 | Tests | Vitest | Phase 1 |
 | Formatting and linting | Biome | Phase 1 |
+| Architecture boundaries | Clean Architecture Highlighter CLI | Phase 2 |
 | Storage | Cloudflare KV | Phase 3 |
 | Infrastructure as code | Terraform | Phase 4 |
 | Environment composition | Terragrunt | Phase 5 |
@@ -69,36 +72,61 @@ bootstrap. Directories should be added by the phase that gives them a purpose.
 | Security scanning | Trivy | Phase 6 or 16 |
 | Load testing | k6 | Phase 14 |
 
-Exact versions will be pinned when each tool is introduced. The JavaScript
-package manager will be selected during project bootstrap and committed with its
-lockfile.
+The Phase 1 toolchain is pinned to:
 
-## Target commands
+| Tool | Version |
+| --- | --- |
+| GNU Make | 4.4.1 |
+| Node.js | 24.21.0 |
+| pnpm | 12.8.1 |
+| TypeScript | 7.0.2 |
+| Wrangler | 4.144.0 |
+| Vitest | 4.1.11 |
+| Cloudflare Vitest plugin | 1.3.3 |
+| Biome | 2.5.14 |
+| Husky | 9.1.7 |
 
-The common task interface is expected to include:
+Direct dependencies use exact versions and `app/pnpm-lock.yaml` fixes the full
+dependency graph. The pnpm configuration explicitly allows the installation
+scripts required by `esbuild` and `workerd`; other dependency build scripts
+remain blocked by default.
+
+## Setup
+
+Install the pinned tools and dependencies from the repository root:
 
 ```bash
 mise install
-
-mise run dev
-mise run format
-mise run lint
-mise run typecheck
-mise run test
-
-mise run infra:fmt
-mise run infra:validate
-mise run infra:plan
-mise run infra:apply
-
-mise run load-test
+make install
 ```
 
-Only add a documented command when it is executable. Until Phase 1 is complete,
-these commands remain target examples.
+## Shared commands
 
-GitHub Actions should call these repository tasks instead of maintaining a
-second set of CI-only command sequences.
+The implemented application task interface is:
+
+```bash
+make help
+make dev
+make format
+make lint
+make typecheck
+make test
+make pre-commit
+make check
+```
+
+Infrastructure validation and load-testing tasks will be added by the phases
+that introduce those capabilities. Only add a documented command when it is
+executable.
+
+Make is the public operational interface and delegates to the tool versions and
+tasks managed by mise. GitHub Actions should call these Make targets instead of
+maintaining a second set of CI-only command sequences.
+
+`make install` also configures the Husky pre-commit hook. The hook delegates to
+`make pre-commit`, which runs the fast lint check across the application. Hooks
+provide local feedback but are not enforcement: contributors can skip them, so
+the same checks must remain part of `make check` and future pull-request gates.
 
 ## Configuration and secrets
 
@@ -132,7 +160,9 @@ rollout boundaries, deterministic assignment, and authorization decisions.
 ### Worker integration tests
 
 Integration tests will exercise request handling and Cloudflare bindings using
-the Workers testing tools selected during implementation.
+the official `@cloudflare/vitest-plugin`. Wrangler generates runtime types from
+the committed compatibility date before type-checking so the application types
+match the configured Workers runtime.
 
 ### Infrastructure checks
 

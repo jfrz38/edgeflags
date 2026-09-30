@@ -1,0 +1,29 @@
+[tools]
+make = "4.4.1"
+node = "24.21.0"
+pnpm = "12.8.1"
+
+[tasks.dev]
+description = "Start the Worker locally"
+dir = "app"
+run = "pnpm run dev"
+
+[tasks.format]
+description = "Format application files"
+dir = "app"
+run = "pnpm run format"
+
+[tasks.lint]
+description = "Lint application files"
+dir = "app"
+run = "pnpm run lint"
+
+[tasks.typecheck]
+description = "Type-check the Worker and tests"
+dir = "app"
+run = "pnpm run typecheck"
+
+[tasks.test]
+description = "Run application tests"
+dir = "app"
+run = "pnpm run test"

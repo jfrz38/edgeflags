@@ -11,12 +11,13 @@ observability, and site reliability engineering.
 
 ## Current status
 
-The project is in the **design and bootstrap stage**. There is no application or
-infrastructure implementation yet.
+Phase 1, the project bootstrap, is complete. The repository contains a minimal
+local Worker and a reproducible development toolchain. Feature flag behavior and
+cloud infrastructure have not been implemented yet.
 
-The commands, repository paths, APIs, and architecture described in the
-documentation are target outcomes. They will become available incrementally as
-the roadmap is implemented.
+The APIs, infrastructure, and broader architecture described in the
+documentation remain target outcomes. They will become available incrementally
+as the roadmap is implemented.
 
 ## Purpose
 
@@ -102,22 +103,36 @@ criteria.
 The canonical roadmap is [docs/ROADMAP.md](docs/ROADMAP.md). GitHub milestones
 will represent phases, while issues will represent reviewable units of work.
 
-## Target developer workflow
+## Developer workflow
 
-The intended interface is:
+Install the pinned toolchain and application dependencies from a clean clone:
 
 ```bash
 mise install
-mise run dev
-mise run format
-mise run lint
-mise run typecheck
-mise run test
+make install
+```
+
+The shared task interface is:
+
+```bash
+make help
+make dev
+make format
+make lint
+make typecheck
+make test
+make pre-commit
+make check
 ```
 
 Infrastructure, security, and load-testing tasks will be added through the same
-interface in their corresponding phases. These commands are **not available
-yet**.
+interface in their corresponding phases. The Make targets delegate tool
+execution to the versions and tasks managed by mise.
+
+Installing dependencies also configures the Husky pre-commit hook. The hook runs
+the fast `make pre-commit` checks and can be invoked directly when needed. It is
+a local feedback mechanism; repository validation must not rely on a hook that
+Git allows contributors to skip.
 
 ## Branches and releases
 
