@@ -1,16 +1,13 @@
-const serviceStatus = {
-  service: "edgeflags",
-  status: "ok",
-};
+import { FlagService } from "./application/flag-service";
+import { createHttpHandler } from "./infrastructure/http";
+import { InMemoryFlagRepository } from "./infrastructure/in-memory-flag-repository";
+
+const handleRequest = createHttpHandler(
+  new FlagService(new InMemoryFlagRepository()),
+);
 
 export default {
-  fetch(request): Response {
-    const url = new URL(request.url);
-
-    if (request.method === "GET" && url.pathname === "/") {
-      return Response.json(serviceStatus);
-    }
-
-    return Response.json({ error: "Not Found" }, { status: 404 });
+  fetch(request): Promise<Response> {
+    return handleRequest(request);
   },
 } satisfies ExportedHandler<Env>;
