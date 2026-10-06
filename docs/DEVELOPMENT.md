@@ -85,6 +85,7 @@ The Phase 1 toolchain is pinned to:
 | Cloudflare Vitest plugin | 1.3.3 |
 | Biome | 2.5.14 |
 | Husky | 9.1.7 |
+| Clean Architecture Highlighter CLI | 0.1.0 |
 
 Direct dependencies use exact versions and `app/pnpm-lock.yaml` fixes the full
 dependency graph. The pnpm configuration explicitly allows the installation
@@ -107,6 +108,7 @@ The implemented application task interface is:
 ```bash
 make help
 make dev
+make architecture
 make format
 make lint
 make typecheck
@@ -122,6 +124,11 @@ executable.
 Make is the public operational interface and delegates to the tool versions and
 tasks managed by mise. GitHub Actions should call these Make targets instead of
 maintaining a second set of CI-only command sequences.
+
+`make architecture` checks the implemented dependency direction: infrastructure
+may depend on application and domain, application may depend on domain, and
+domain remains independent. `make check` runs this check before linting,
+type-checking, and tests.
 
 `make install` also configures the Husky pre-commit hook. The hook delegates to
 `make pre-commit`, which runs the fast lint check across the application. Hooks
