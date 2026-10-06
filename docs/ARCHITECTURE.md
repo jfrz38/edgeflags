@@ -94,6 +94,17 @@ Business rules should remain testable independently from Cloudflare request and
 storage APIs. The exact internal module structure will be selected while the
 application is implemented rather than prescribed in advance.
 
+The implemented core follows these organization conventions:
+
+- each public class, interface, and independently reusable type has its own file,
+- each application use case represents one action and exposes `dispatch`,
+- HTTP handlers depend only on the use case needed by their operation, and
+- private implementation details remain with the responsibility that owns them.
+
+These conventions favor small, directly named units over service files that
+group unrelated operations. The dependency direction remains infrastructure to
+application to domain regardless of file size.
+
 ### Cloudflare KV
 
 KV is the target persistent store for feature flags. It is selected for its
