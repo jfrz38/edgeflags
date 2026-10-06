@@ -14,7 +14,10 @@ install: ## Install application dependencies from the lockfile
 dev: ## Start the Worker locally
 	$(MISE) run dev
 
-.PHONY: format lint typecheck test pre-commit check
+.PHONY: architecture format lint typecheck test pre-commit check
+architecture: ## Check application architecture boundaries
+	$(MISE) run architecture
+
 format: ## Format application files
 	$(MISE) run format
 
@@ -30,7 +33,8 @@ test: ## Run application tests
 pre-commit: ## Run fast checks before creating a commit
 	$(MAKE) lint
 
-check: ## Run lint, type-checking, and tests
+check: ## Run architecture, lint, type-checking, and tests
+	$(MAKE) architecture
 	$(MAKE) lint
 	$(MAKE) typecheck
 	$(MAKE) test
