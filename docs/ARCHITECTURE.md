@@ -1,8 +1,8 @@
 # EdgeFlags Architecture
 
-This document describes the target architecture and the constraints that shape
-it. It does not describe an existing implementation: EdgeFlags is currently in
-the design and bootstrap stage.
+This document describes the implemented core architecture, its planned
+evolution, and the constraints that shape it. EdgeFlags currently provides the
+Phase 2 local feature flag service with temporary in-memory storage.
 
 ## Status language
 
@@ -62,8 +62,9 @@ EdgeFlags is designed around these constraints:
                          +-------------------+
 ```
 
-All components in this diagram are **target** components. The telemetry path is
-also subject to a feasibility experiment before it becomes part of the default
+The TypeScript Worker is current and runs locally. Cloudflare KV, deployed edge
+resources, and the telemetry path are target components. The telemetry path is
+subject to a feasibility experiment before it becomes part of the default
 deployment.
 
 ## Component responsibilities
@@ -92,6 +93,17 @@ The Worker is the application boundary. Its planned responsibilities are:
 Business rules should remain testable independently from Cloudflare request and
 storage APIs. The exact internal module structure will be selected while the
 application is implemented rather than prescribed in advance.
+
+The implemented core follows these organization conventions:
+
+- each public class, interface, and independently reusable type has its own file,
+- each application use case represents one action and exposes `dispatch`,
+- HTTP handlers depend only on the use case needed by their operation, and
+- private implementation details remain with the responsibility that owns them.
+
+These conventions favor small, directly named units over service files that
+group unrelated operations. The dependency direction remains infrastructure to
+application to domain regardless of file size.
 
 ### Cloudflare KV
 
@@ -122,7 +134,7 @@ against the current Cloudflare documentation and pricing.
 
 ## Feature flag model
 
-The first implemented model will contain boolean flags:
+The implemented model contains boolean flags:
 
 ```json
 {
@@ -131,9 +143,9 @@ The first implemented model will contain boolean flags:
 }
 ```
 
-The first evaluation behavior is intentionally direct: an existing flag returns
-its boolean value. Validation rules, not-found behavior, and the persisted value
-schema will be finalized in the core feature flag phase.
+Evaluation is intentionally direct: an existing flag returns its boolean value,
+while an absent flag produces a not-found result. Keys contain 1 to 64 lowercase
+letters, numbers, or hyphens and start with a letter or number.
 
 Later phases may extend the model with:
 
@@ -154,7 +166,7 @@ is designed and tested.
 
 ## HTTP API
 
-The initial target surface is:
+The implemented surface is:
 
 ```http
 GET /flags/:key
@@ -167,13 +179,17 @@ The management endpoints create, replace, read, and delete flag definitions.
 The evaluation endpoint returns the effective value without exposing storage
 details.
 
-Request schemas, response schemas, status codes, conditional behavior, and the
-error format will be specified and tested during the core feature flag phase.
-They are not considered stable contracts yet.
+Request schemas, responses, status codes, and errors are specified in
+[API.md](API.md) and covered by Worker integration tests.
 
 ## Storage model
 
-A candidate key format is:
+The current implementation uses an in-memory repository behind an application
+storage boundary. State can disappear when an isolate is replaced and is not
+shared between isolates. This adapter exists only for local learning and will be
+replaced by Cloudflare KV in Phase 3.
+
+A candidate future KV key format is:
 
 ```text
 flags:{environment}:{flagKey}

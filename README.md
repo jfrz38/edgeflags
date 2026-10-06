@@ -11,13 +11,14 @@ observability, and site reliability engineering.
 
 ## Current status
 
-Phase 1, the project bootstrap, is complete. The repository contains a minimal
-local Worker and a reproducible development toolchain. Feature flag behavior and
-cloud infrastructure have not been implemented yet.
+Phases 1 and 2 are complete. The repository contains a reproducible development
+toolchain and a local Worker that can create, replace, read, delete, and evaluate
+boolean feature flags. Storage is currently in memory; Cloudflare KV and cloud
+infrastructure have not been implemented yet.
 
-The APIs, infrastructure, and broader architecture described in the
-documentation remain target outcomes. They will become available incrementally
-as the roadmap is implemented.
+The remaining infrastructure and broader architecture described in the
+documentation are target outcomes. They will become available incrementally as
+the roadmap is implemented.
 
 ## Purpose
 
@@ -87,6 +88,7 @@ interfaces, constraints, and planned evolution.
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md): target system design and boundaries
+- [API](docs/API.md): implemented HTTP operations, responses, and errors
 - [Development](docs/DEVELOPMENT.md): target local workflow, tools, and tests
 - [Delivery](docs/DELIVERY.md): branches, environments, CI, and deployments
 - [Roadmap](docs/ROADMAP.md): canonical implementation order and outcomes
@@ -117,6 +119,7 @@ The shared task interface is:
 ```bash
 make help
 make dev
+make architecture
 make format
 make lint
 make typecheck

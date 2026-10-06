@@ -8,6 +8,11 @@ description = "Start the Worker locally"
 dir = "app"
 run = "pnpm run dev"
 
+[tasks.architecture]
+description = "Check application architecture boundaries"
+dir = "app"
+run = "pnpm run architecture"
+
 [tasks.format]
 description = "Format application files"
 dir = "app"
