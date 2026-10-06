@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { FlagKey, InvalidFlagKeyError } from "../../src/domain/feature-flag";
+import { FlagKey } from "../../src/domain/flag-key";
+import { InvalidFlagKeyError } from "../../src/domain/invalid-flag-key-error";
 
 describe("FlagKey", () => {
   it.each(["a", "new-checkout", "flag-123", "a".repeat(64)])(

@@ -1,7 +1,8 @@
-import type { FlagRepository } from "../application/flag-service";
-import type { FeatureFlag, FlagKey } from "../domain/feature-flag";
+import type { FlagRepository } from "../../../src/application/flag-repository";
+import type { FeatureFlag } from "../../../src/domain/feature-flag";
+import type { FlagKey } from "../../../src/domain/flag-key";
 
-export class InMemoryFlagRepository implements FlagRepository {
+export class FakeFlagRepository implements FlagRepository {
   private readonly flags = new Map<string, FeatureFlag>();
 
   async find(key: FlagKey): Promise<FeatureFlag | null> {
