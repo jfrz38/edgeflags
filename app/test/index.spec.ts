@@ -1,4 +1,4 @@
-import { exports } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 describe("EdgeFlags Worker", () => {
@@ -94,6 +94,20 @@ describe("EdgeFlags Worker", () => {
     expect(response.status).toBe(415);
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "UNSUPPORTED_MEDIA_TYPE" },
+    });
+  });
+
+  it("returns a generic internal error for corrupt persisted data", async () => {
+    await env.FLAGS_KV.put("flags:corrupt", "{");
+
+    const response = await request("GET", "/flags/corrupt");
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
     });
   });
 

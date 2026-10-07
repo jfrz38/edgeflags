@@ -18,36 +18,40 @@ export function createHttpHandler(
   evaluateFlag: EvaluateFlag,
 ) {
   return async (request: Request): Promise<Response> => {
-    const url = new URL(request.url);
+    try {
+      const url = new URL(request.url);
 
-    if (url.pathname === "/") {
-      return request.method === "GET"
-        ? handleGetServiceStatus()
-        : methodNotAllowed("GET");
-    }
-
-    const flagRoute = matchKeyRoute(url.pathname, "/flags/");
-    if (flagRoute !== null) {
-      if (request.method === "GET") {
-        return handleGetFlag(getFlag, flagRoute);
-      }
-      if (request.method === "PUT") {
-        return handlePutFlag(request, putFlag, flagRoute);
-      }
-      if (request.method === "DELETE") {
-        return handleDeleteFlag(deleteFlag, flagRoute);
+      if (url.pathname === "/") {
+        return request.method === "GET"
+          ? handleGetServiceStatus()
+          : methodNotAllowed("GET");
       }
 
-      return methodNotAllowed("GET, PUT, DELETE");
-    }
+      const flagRoute = matchKeyRoute(url.pathname, "/flags/");
+      if (flagRoute !== null) {
+        if (request.method === "GET") {
+          return await handleGetFlag(getFlag, flagRoute);
+        }
+        if (request.method === "PUT") {
+          return await handlePutFlag(request, putFlag, flagRoute);
+        }
+        if (request.method === "DELETE") {
+          return await handleDeleteFlag(deleteFlag, flagRoute);
+        }
 
-    const evaluationRoute = matchKeyRoute(url.pathname, "/evaluate/");
-    if (evaluationRoute !== null) {
-      return request.method === "GET"
-        ? handleEvaluateFlag(evaluateFlag, evaluationRoute)
-        : methodNotAllowed("GET");
-    }
+        return methodNotAllowed("GET, PUT, DELETE");
+      }
 
-    return errorResponse(404, "ROUTE_NOT_FOUND", "Route not found");
+      const evaluationRoute = matchKeyRoute(url.pathname, "/evaluate/");
+      if (evaluationRoute !== null) {
+        return request.method === "GET"
+          ? await handleEvaluateFlag(evaluateFlag, evaluationRoute)
+          : methodNotAllowed("GET");
+      }
+
+      return errorResponse(404, "ROUTE_NOT_FOUND", "Route not found");
+    } catch {
+      return errorResponse(500, "INTERNAL_ERROR", "An internal error occurred");
+    }
   };
 }
