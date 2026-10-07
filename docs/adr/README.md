@@ -35,3 +35,7 @@ If an ADR supersedes another decision, link both records.
 6. Commit the ADR with the implementation or infrastructure change that makes the decision real.
 
 The ADR history should remain in the repository even when a decision changes so the evolution of the project is understandable later.
+
+## Records
+
+- [ADR 0001: Use versioned Cloudflare KV storage](0001-use-versioned-cloudflare-kv-storage.md) - Accepted

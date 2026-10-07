@@ -135,6 +135,39 @@ type-checking, and tests.
 provide local feedback but are not enforcement: contributors can skip them, so
 the same checks must remain part of `make check` and future pull-request gates.
 
+## Local KV storage
+
+Wrangler provides the `FLAGS_KV` binding declared in `app/wrangler.toml`.
+`make dev` and the Worker integration tests use local KV storage and do not
+require Cloudflare credentials or a remote namespace. The binding is explicitly
+local and has no namespace ID until Phase 4 provisions one.
+
+Wrangler keeps local development state under the ignored `app/.wrangler/`
+directory. To reset all local Wrangler state from the repository root, stop the
+development server and run:
+
+```bash
+rm -rf app/.wrangler/state
+```
+
+Vitest isolates KV state between tests. Persistence adapter tests use the real
+local Workers KV implementation rather than replacing it with an in-memory map.
+
+### Future remote validation
+
+After Phase 4 provisions a development namespace, remote validation must:
+
+1. Deploy the same Worker code with `FLAGS_KV` bound to that namespace.
+2. Create, read, evaluate, replace, and delete a uniquely named disposable flag.
+3. Confirm persisted values use the documented versioned representation without
+   exposing credentials or values through Terraform outputs.
+4. Record the account, environment, deployment identifier, time, and observed
+   result.
+5. Remove the disposable flag.
+
+This check proves remote wiring, not global consistency. Cross-location stale
+read and propagation measurements belong to Phase 15.
+
 ## Configuration and secrets
 
 Configuration must distinguish public identifiers from credentials:

@@ -110,11 +110,27 @@ Expected errors use a stable JSON envelope:
 | `404` | `ROUTE_NOT_FOUND` | The requested path is not part of the API. |
 | `405` | `METHOD_NOT_ALLOWED` | A known path does not support the HTTP method. |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | A `PUT` request is not JSON. |
+| `500` | `INTERNAL_ERROR` | Storage failed or persisted data could not be read safely. |
 
-## Temporary storage
+Unexpected failures use the same envelope without exposing provider details:
 
-The current repository is an in-memory adapter. Data can disappear when the
-local Worker restarts or a Cloudflare isolate is replaced, and different
-isolates do not share state. This behavior is suitable only for local learning
-and tests. Phase 3 replaces this adapter with Cloudflare KV while preserving the
-application and HTTP behavior.
+```json
+{
+  "error": {
+    "code": "INTERNAL_ERROR",
+    "message": "An internal error occurred"
+  }
+}
+```
+
+## Storage consistency
+
+The Worker stores flags in Cloudflare KV. Local development and integration
+tests use a local KV binding; remote namespaces are introduced with
+infrastructure provisioning.
+
+KV is eventually consistent when deployed. A successful write or delete may not
+be visible immediately from every location. The `201` or `200` returned by
+`PUT` depends on the value visible before the write, so it does not provide an
+atomic global create-or-replace distinction. Clients may retry `PUT` and
+`DELETE`, but must not use the status distinction as a concurrency guarantee.

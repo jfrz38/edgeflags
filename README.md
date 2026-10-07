@@ -11,10 +11,11 @@ observability, and site reliability engineering.
 
 ## Current status
 
-Phases 1 and 2 are complete. The repository contains a reproducible development
-toolchain and a local Worker that can create, replace, read, delete, and evaluate
-boolean feature flags. Storage is currently in memory; Cloudflare KV and cloud
-infrastructure have not been implemented yet.
+Phases 1 and 2 are complete, and Phase 3 implementation is in progress. The
+repository contains a reproducible development toolchain and a local Worker that
+can create, replace, read, delete, and evaluate boolean feature flags backed by
+local Cloudflare KV. Remote KV provisioning and cloud infrastructure have not
+been implemented yet.
 
 The remaining infrastructure and broader architecture described in the
 documentation are target outcomes. They will become available incrementally as
