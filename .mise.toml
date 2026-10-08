@@ -2,6 +2,7 @@
 make = "4.4.1"
 node = "24.21.0"
 pnpm = "12.8.1"
+terraform = "1.16.5"
 
 [tasks.dev]
 description = "Start the Worker locally"
@@ -32,3 +33,35 @@ run = "pnpm run typecheck"
 description = "Run application tests"
 dir = "app"
 run = "pnpm run test"
+
+[tasks.infra-init]
+description = "Initialize development infrastructure"
+run = "terraform -chdir=infra/live/dev init"
+
+[tasks.infra-format]
+description = "Format infrastructure files"
+run = "terraform fmt -recursive infra"
+
+[tasks.infra-format-check]
+description = "Check infrastructure formatting"
+run = "terraform fmt -check -recursive infra"
+
+[tasks.infra-validate]
+description = "Validate development infrastructure"
+run = "terraform -chdir=infra/live/dev validate"
+
+[tasks.infra-plan]
+description = "Create a development infrastructure plan"
+run = "terraform -chdir=infra/live/dev plan -out=edgeflags-dev.tfplan"
+
+[tasks.infra-show]
+description = "Show the saved development infrastructure plan"
+run = "terraform -chdir=infra/live/dev show edgeflags-dev.tfplan"
+
+[tasks.infra-apply]
+description = "Apply the reviewed development infrastructure plan"
+run = "terraform -chdir=infra/live/dev apply edgeflags-dev.tfplan"
+
+[tasks.infra-destroy]
+description = "Destroy development infrastructure"
+run = "terraform -chdir=infra/live/dev destroy"

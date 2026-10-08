@@ -2,3 +2,13 @@ app/node_modules/
 app/.wrangler/
 app/coverage/
 app/worker-configuration.d.ts
+app/wrangler.dev.toml
+
+infra/**/.terraform/
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+infra/**/*.tfplan
+infra/**/*.tfvars
+infra/**/*.tfvars.json
+infra/**/.terraform.tfstate.lock.info
+infra/**/crash.log
