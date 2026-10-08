@@ -5,7 +5,7 @@ the order, scope, and observable outcome of each phase. The
 [README](../README.md) provides only a summary and must not maintain a separate
 phase list.
 
-EdgeFlags has completed **Phases 1 and 2**. Phase 3 implementation is in
+EdgeFlags has completed **Phases 1 through 3**. Phase 4 implementation is in
 progress.
 
 ## Planning model
@@ -88,7 +88,7 @@ Cloudflare KV, authentication, rollouts, targeting, and multiple environments.
 
 ## Phase 3 - Cloudflare KV integration
 
-**Status:** In progress since 2026-10-06.
+**Status:** Completed on 2026-10-08.
 
 ### Objective
 
@@ -119,6 +119,8 @@ Reproducible cloud provisioning, multi-environment keys, and propagation-delay
 measurements across locations. Remote validation completes in Phases 4 and 15.
 
 ## Phase 4 - Terraform foundation
+
+**Status:** In progress since 2026-10-08.
 
 ### Objective
 

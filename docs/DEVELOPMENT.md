@@ -86,6 +86,8 @@ The Phase 1 toolchain is pinned to:
 | Biome | 2.5.14 |
 | Husky | 9.1.7 |
 | Clean Architecture Highlighter CLI | 0.1.0 |
+| Terraform | 1.16.5 |
+| Cloudflare Terraform provider | 5.27.0 |
 
 Direct dependencies use exact versions and `app/pnpm-lock.yaml` fixes the full
 dependency graph. The pnpm configuration explicitly allows the installation
@@ -113,13 +115,19 @@ make format
 make lint
 make typecheck
 make test
+make infra-init
+make infra-format
+make infra-check
+make infra-plan
 make pre-commit
 make check
 ```
 
-Infrastructure validation and load-testing tasks will be added by the phases
-that introduce those capabilities. Only add a documented command when it is
-executable.
+Mutable infrastructure and deployment commands are intentionally separate from
+routine checks: `make infra-apply`, `make deploy-dev`, and
+`make infra-destroy`. `infra-apply` consumes the saved plan created by
+`infra-plan`; `infra-destroy` remains interactive. Only run these commands after
+reviewing the target account and expected changes.
 
 Make is the public operational interface and delegates to the tool versions and
 tasks managed by mise. GitHub Actions should call these Make targets instead of
@@ -134,6 +142,62 @@ type-checking, and tests.
 `make pre-commit`, which runs the fast lint check across the application. Hooks
 provide local feedback but are not enforcement: contributors can skip them, so
 the same checks must remain part of `make check` and future pull-request gates.
+
+## Development infrastructure
+
+Terraform configuration lives under `infra/`. The `infra/modules/kv` module
+owns a Cloudflare KV namespace, and `infra/live/dev` instantiates it for the
+development environment. Terraform owns the namespace; Wrangler owns the Worker
+artifact and deployment.
+
+Set credentials in the process environment, never in committed `.tfvars` files:
+
+```bash
+export CLOUDFLARE_API_TOKEN="..."
+export TF_VAR_cloudflare_account_id="..."
+```
+
+The token needs the smallest account-scoped permissions that allow Workers KV
+namespace edits for the selected development account. Wrangler also needs
+permission to deploy Workers scripts. The account identifier is not secret, but
+using an environment variable avoids committing operator-specific values.
+
+Review and apply development infrastructure from the repository root:
+
+```bash
+make infra-check
+make infra-plan
+make infra-show
+make infra-apply
+```
+
+`make infra-plan` writes an ignored `edgeflags-dev.tfplan`; changes to code,
+variables, credentials, or remote state require a new plan. Applying remote
+changes always requires an explicit command and authorization.
+
+This iteration deliberately uses local Terraform state. Files matching
+`*.tfstate`, saved plans, and `.terraform/` are ignored. The operator must keep
+the state private and backed up because losing it breaks Terraform's ownership
+record. A shared backend must be selected before multi-operator or automated
+applies.
+
+After apply, deploy the Worker with the provisioned binding:
+
+```bash
+make deploy-dev
+```
+
+The deployment target generates ignored `app/wrangler.dev.toml` from the local
+Wrangler configuration and Terraform output, then deploys `edgeflags-dev` with
+the `FLAGS_KV` binding. Do not edit or commit the generated file. This path does
+not change `make dev`: local execution continues to use local KV and cannot fall
+back to Cloudflare resources.
+
+To remove the namespace after deleting any deployed Worker that consumes it:
+
+```bash
+make infra-destroy
+```
 
 ## Local KV storage
 
@@ -153,9 +217,9 @@ rm -rf app/.wrangler/state
 Vitest isolates KV state between tests. Persistence adapter tests use the real
 local Workers KV implementation rather than replacing it with an in-memory map.
 
-### Future remote validation
+### Remote validation
 
-After Phase 4 provisions a development namespace, remote validation must:
+After applying the development namespace and deploying the Worker:
 
 1. Deploy the same Worker code with `FLAGS_KV` bound to that namespace.
 2. Create, read, evaluate, replace, and delete a uniquely named disposable flag.
@@ -164,6 +228,14 @@ After Phase 4 provisions a development namespace, remote validation must:
 4. Record the account, environment, deployment identifier, time, and observed
    result.
 5. Remove the disposable flag.
+
+Use a unique key such as `phase4-<UTC timestamp>`. Record the commit, account,
+Worker deployment identifier, public URL, time, Terraform plan summary, and
+observed responses without recording credentials. Use `wrangler kv key get`
+against the namespace ID from `terraform output flags_kv_namespace_id` to
+confirm the stored JSON has `version: 1`, then delete the disposable key through
+the API. Eventual consistency may require bounded retries; it must not be
+reported as a strong read-after-write guarantee.
 
 This check proves remote wiring, not global consistency. Cross-location stale
 read and propagation measurements belong to Phase 15.
@@ -184,9 +256,10 @@ Local secrets should use mechanisms supported by Wrangler and mise. CI/CD
 secrets should use GitHub environment or repository secrets with the narrowest
 practical permissions.
 
-Variable names and setup instructions will be documented when their consuming
-component is implemented. Example files must contain placeholders, never usable
-credentials.
+Implemented infrastructure uses `CLOUDFLARE_API_TOKEN` and
+`TF_VAR_cloudflare_account_id`. Future variable names will be documented when
+their consuming component is implemented. Example files must contain
+placeholders, never usable credentials.
 
 ## Testing strategy
 

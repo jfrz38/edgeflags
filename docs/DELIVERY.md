@@ -1,7 +1,8 @@
 # EdgeFlags Delivery
 
-This document defines the target branch, environment, and delivery model. No CI
-or deployment automation exists yet.
+This document defines the target branch, environment, and delivery model. A
+manual development provisioning and deployment workflow exists; CI and
+deployment automation do not.
 
 ## Branch model
 
@@ -88,6 +89,33 @@ smoke tests
 Whether development deployments happen on every merge to `develop`, through a
 manual workflow, or through another controlled trigger will be decided during
 the continuous deployment phase.
+
+## Current manual development flow
+
+The Phase 4 workflow provisions the development KV namespace with Terraform and
+deploys the Worker with Wrangler:
+
+```text
+make infra-plan
+        |
+        v
+review saved plan
+        |
+        v
+make infra-apply
+        |
+        v
+make deploy-dev
+        |
+        v
+manual remote validation
+```
+
+Terraform owns the KV namespace. Wrangler owns the Worker deployment and reads
+the namespace ID from Terraform output through an ignored generated
+configuration. These commands require explicit local credentials and are not
+run by `make check`. There is no automatic deployment trigger or production
+environment in this phase.
 
 ## Promotion requirements
 
