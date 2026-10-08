@@ -5,7 +5,8 @@ the order, scope, and observable outcome of each phase. The
 [README](../README.md) provides only a summary and must not maintain a separate
 phase list.
 
-EdgeFlags has completed **Phases 1 and 2** and is ready for Phase 3 planning.
+EdgeFlags has completed **Phases 1 and 2**. Phase 3 implementation is in
+progress.
 
 ## Planning model
 
@@ -86,6 +87,8 @@ Phase 1.
 Cloudflare KV, authentication, rollouts, targeting, and multiple environments.
 
 ## Phase 3 - Cloudflare KV integration
+
+**Status:** In progress since 2026-10-06.
 
 ### Objective
 

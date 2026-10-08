@@ -2,7 +2,7 @@
 
 This document describes the implemented core architecture, its planned
 evolution, and the constraints that shape it. EdgeFlags currently provides the
-Phase 2 local feature flag service with temporary in-memory storage.
+boolean feature flag service backed by a local Cloudflare KV binding.
 
 ## Status language
 
@@ -62,10 +62,10 @@ EdgeFlags is designed around these constraints:
                          +-------------------+
 ```
 
-The TypeScript Worker is current and runs locally. Cloudflare KV, deployed edge
-resources, and the telemetry path are target components. The telemetry path is
-subject to a feasibility experiment before it becomes part of the default
-deployment.
+The TypeScript Worker and its local Cloudflare KV binding are current. Remotely
+provisioned KV and deployed edge resources remain target components. The
+telemetry path is subject to a feasibility experiment before it becomes part of
+the default deployment.
 
 ## Component responsibilities
 
@@ -107,9 +107,9 @@ application to domain regardless of file size.
 
 ### Cloudflare KV
 
-KV is the target persistent store for feature flags. It is selected for its
-edge-oriented, read-heavy model and as a deliberate opportunity to study
-eventual consistency.
+KV is the implemented local persistent store for feature flags. It is selected
+for its edge-oriented, read-heavy model and as a deliberate opportunity to
+study eventual consistency. Remote namespace provisioning follows in Phase 4.
 
 KV must not be presented as strongly consistent. Updates can remain stale at
 other locations, so experiments will measure propagation and document when this
@@ -184,27 +184,36 @@ Request schemas, responses, status codes, and errors are specified in
 
 ## Storage model
 
-The current implementation uses an in-memory repository behind an application
-storage boundary. State can disappear when an isolate is replaced and is not
-shared between isolates. This adapter exists only for local learning and will be
-replaced by Cloudflare KV in Phase 3.
+The current implementation uses `KvFlagRepository` behind the application
+storage boundary. The Worker receives the `FLAGS_KV` binding from its runtime;
+domain and application code do not import Cloudflare APIs.
 
-A candidate future KV key format is:
-
-```text
-flags:{environment}:{flagKey}
-```
-
-For example:
+The current KV key format is:
 
 ```text
-flags:dev:new-checkout
-flags:prod:new-checkout
+flags:{flagKey}
 ```
 
-Environment-aware keys are a target for the advanced evaluation phase. Earlier
-phases may use a simpler local model. The persisted value must be explicit and
-versionable before KV becomes the backing store.
+Values use a strict versioned representation:
+
+```json
+{
+  "version": 1,
+  "key": "new-checkout",
+  "enabled": true
+}
+```
+
+Malformed data, unsupported versions, unexpected fields, and mismatched embedded
+keys are treated as internal storage failures. Environment-aware keys remain a
+target for the advanced evaluation phase and will require an explicit
+compatibility decision.
+
+KV reads and existence checks are not strongly consistent. The API preserves
+the `PUT` distinction between `201 Created` and `200 OK`, but that result depends
+on the value visible to the read before the write and is not an atomic global
+creation guarantee. A read after a write or delete can also observe stale data
+from another location.
 
 Expected consistency experiments include:
 
