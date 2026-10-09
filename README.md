@@ -11,11 +11,11 @@ observability, and site reliability engineering.
 
 ## Current status
 
-Phases 1 and 2 are complete, and Phase 3 implementation is in progress. The
-repository contains a reproducible development toolchain and a local Worker that
-can create, replace, read, delete, and evaluate boolean feature flags backed by
-local Cloudflare KV. Remote KV provisioning and cloud infrastructure have not
-been implemented yet.
+Phases 1 through 3 are complete, and Phase 4 implementation is in progress. The
+repository contains a reproducible development toolchain, a local KV-backed
+Worker, and validated Terraform configuration for a remote development KV
+namespace. Applying the infrastructure and validating a deployed Worker still
+require a suitable Cloudflare account and credentials.
 
 The remaining infrastructure and broader architecture described in the
 documentation are target outcomes. They will become available incrementally as
@@ -125,6 +125,7 @@ make format
 make lint
 make typecheck
 make test
+make infra-check
 make pre-commit
 make check
 ```

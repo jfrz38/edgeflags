@@ -33,8 +33,41 @@ test: ## Run application tests
 pre-commit: ## Run fast checks before creating a commit
 	$(MAKE) lint
 
-check: ## Run architecture, lint, type-checking, and tests
+check: ## Run application and infrastructure checks
 	$(MAKE) architecture
 	$(MAKE) lint
 	$(MAKE) typecheck
 	$(MAKE) test
+	$(MAKE) infra-check
+
+.PHONY: infra-init infra-format infra-check infra-plan infra-show infra-apply infra-destroy
+infra-init: ## Initialize Terraform for the development environment
+	$(MISE) run infra-init
+
+infra-format: ## Format Terraform files
+	$(MISE) run infra-format
+
+infra-check: ## Check Terraform formatting and configuration
+	$(MISE) run infra-format-check
+	$(MAKE) infra-init
+	$(MISE) run infra-validate
+
+infra-plan: ## Create the development plan (requires Cloudflare variables)
+	$(MAKE) infra-init
+	$(MISE) run infra-plan
+
+infra-show: ## Show the saved development plan
+	$(MISE) run infra-show
+
+infra-apply: ## Apply the saved development plan
+	$(MISE) run infra-apply
+
+infra-destroy: ## Destroy development resources after confirmation
+	$(MISE) run infra-destroy
+
+.PHONY: configure-dev deploy-dev
+configure-dev: ## Generate the ignored Wrangler dev configuration from Terraform state
+	$(MISE) exec -- node infra/scripts/configure-dev-worker.mjs
+
+deploy-dev: configure-dev ## Deploy the Worker and bind the provisioned development KV
+	$(MISE) exec -- pnpm --dir app exec wrangler deploy --env dev --config wrangler.dev.toml

@@ -62,10 +62,10 @@ EdgeFlags is designed around these constraints:
                          +-------------------+
 ```
 
-The TypeScript Worker and its local Cloudflare KV binding are current. Remotely
-provisioned KV and deployed edge resources remain target components. The
-telemetry path is subject to a feasibility experiment before it becomes part of
-the default deployment.
+The TypeScript Worker and its local Cloudflare KV binding are current. Terraform
+configuration can provision a development KV namespace, while remote apply and
+deployment remain explicit operator actions. The telemetry path is subject to a
+feasibility experiment before it becomes part of the default deployment.
 
 ## Component responsibilities
 
@@ -107,9 +107,10 @@ application to domain regardless of file size.
 
 ### Cloudflare KV
 
-KV is the implemented local persistent store for feature flags. It is selected
-for its edge-oriented, read-heavy model and as a deliberate opportunity to
-study eventual consistency. Remote namespace provisioning follows in Phase 4.
+KV is the implemented persistent store for feature flags. It is selected for its
+edge-oriented, read-heavy model and as a deliberate opportunity to study
+eventual consistency. Local development uses Wrangler-managed local state; the
+development remote namespace is managed by Terraform.
 
 KV must not be presented as strongly consistent. Updates can remain stale at
 other locations, so experiments will measure propagation and document when this
