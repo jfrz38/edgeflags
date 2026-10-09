@@ -5,8 +5,9 @@ the order, scope, and observable outcome of each phase. The
 [README](../README.md) provides only a summary and must not maintain a separate
 phase list.
 
-EdgeFlags has completed **Phases 1 through 3**. Phase 4 implementation is in
-progress.
+EdgeFlags has completed **Phases 1 through 3**. Phases 4 and 5 are implemented
+and validated locally; both remain in progress because their remote completion
+criteria require a Cloudflare account that is not currently available.
 
 ## Planning model
 
@@ -122,6 +123,10 @@ measurements across locations. Remote validation completes in Phases 4 and 15.
 
 **Status:** In progress since 2026-10-08.
 
+The Terraform configuration passes local formatting and validation. Applying,
+exercising, and destroying the remote development resources are blocked until a
+suitable Cloudflare account and credentials are available.
+
 ### Objective
 
 Provision the initial Cloudflare resources reproducibly with Terraform and prove
@@ -151,6 +156,13 @@ Phase 3 and access to a suitable Cloudflare account.
 Terragrunt composition, production infrastructure, and automated deployment.
 
 ## Phase 5 - Terragrunt and environments
+
+**Status:** In progress since 2026-10-09.
+
+Terragrunt composition, separate environment inputs, local state isolation, and
+validation for both environments are implemented. Account-backed `dev`
+recreation and a reviewable `prod` plan remain blocked by the same missing
+Cloudflare access as Phase 4.
 
 ### Objective
 

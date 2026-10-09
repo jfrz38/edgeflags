@@ -40,3 +40,4 @@ The ADR history should remain in the repository even when a decision changes so 
 
 - [ADR 0001: Use versioned Cloudflare KV storage](0001-use-versioned-cloudflare-kv-storage.md) - Accepted
 - [ADR 0002: Manage Cloudflare infrastructure with Terraform](0002-manage-cloudflare-infrastructure-with-terraform.md) - Accepted
+- [ADR 0003: Compose environments with Terragrunt](0003-compose-environments-with-terragrunt.md) - Accepted

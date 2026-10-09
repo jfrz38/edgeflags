@@ -33,7 +33,7 @@ protection is configured.
 
 ## Environment model
 
-The target infrastructure contains `dev` and `prod` environments.
+The Terragrunt configuration contains distinct `dev` and `prod` environments.
 
 | Environment | Purpose | Branch relationship |
 | --- | --- | --- |
@@ -90,19 +90,20 @@ Whether development deployments happen on every merge to `develop`, through a
 manual workflow, or through another controlled trigger will be decided during
 the continuous deployment phase.
 
-## Current manual development flow
+## Current manual infrastructure flow
 
-The Phase 4 workflow provisions the development KV namespace with Terraform and
-deploys the Worker with Wrangler:
+Terragrunt composes one KV namespace per environment. Plans are available for
+both environments, while mutable commands and Worker deployment remain limited
+to development:
 
 ```text
-make infra-plan
+make infra-plan ENV=dev
         |
         v
 review saved plan
         |
         v
-make infra-apply
+make infra-apply ENV=dev
         |
         v
 make deploy-dev
@@ -111,11 +112,13 @@ make deploy-dev
 manual remote validation
 ```
 
-Terraform owns the KV namespace. Wrangler owns the Worker deployment and reads
-the namespace ID from Terraform output through an ignored generated
+Terraform owns each KV namespace. Wrangler owns the Worker deployment and reads
+the development namespace ID from Terragrunt output through an ignored generated
 configuration. These commands require explicit local credentials and are not
-run by `make check`. There is no automatic deployment trigger or production
-environment in this phase.
+run by `make check`. `make infra-plan ENV=prod` produces the production plan,
+but production apply and deployment are deliberately unavailable until the
+controlled delivery phase. No remote plan or deployment has been demonstrated
+because a Cloudflare account and credentials are not currently available.
 
 ## Promotion requirements
 

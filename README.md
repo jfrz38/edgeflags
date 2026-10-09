@@ -11,11 +11,11 @@ observability, and site reliability engineering.
 
 ## Current status
 
-Phases 1 through 3 are complete, and Phase 4 implementation is in progress. The
-repository contains a reproducible development toolchain, a local KV-backed
-Worker, and validated Terraform configuration for a remote development KV
-namespace. Applying the infrastructure and validating a deployed Worker still
-require a suitable Cloudflare account and credentials.
+Phases 1 through 3 are complete. Phases 4 and 5 are implemented and validated
+locally, but their remote completion criteria remain blocked until a suitable
+Cloudflare account and credentials are available. The repository contains a
+reproducible development toolchain, a local KV-backed Worker, and Terragrunt
+composition for distinct `dev` and `prod` infrastructure.
 
 The remaining infrastructure and broader architecture described in the
 documentation are target outcomes. They will become available incrementally as
@@ -92,6 +92,7 @@ interfaces, constraints, and planned evolution.
 - [API](docs/API.md): implemented HTTP operations, responses, and errors
 - [Development](docs/DEVELOPMENT.md): target local workflow, tools, and tests
 - [Delivery](docs/DELIVERY.md): branches, environments, CI, and deployments
+- [Infrastructure](docs/INFRASTRUCTURE.md): environment composition, state, and free-tier inventory
 - [Roadmap](docs/ROADMAP.md): canonical implementation order and outcomes
 - [Experiments](docs/EXPERIMENTS.md): planned experiments and result template
 - [Architecture decisions](docs/adr/README.md): ADR policy and records
@@ -126,13 +127,16 @@ make lint
 make typecheck
 make test
 make infra-check
+make infra-plan ENV=dev
+make infra-plan ENV=prod
 make pre-commit
 make check
 ```
 
-Infrastructure, security, and load-testing tasks will be added through the same
-interface in their corresponding phases. The Make targets delegate tool
-execution to the versions and tasks managed by mise.
+Infrastructure tasks select `dev` by default and accept `ENV=dev|prod` where
+documented. Security and load-testing tasks will be added through the same
+interface in their corresponding phases. Make delegates tool execution to the
+versions managed by mise.
 
 Installing dependencies also configures the Husky pre-commit hook. The hook runs
 the fast `make pre-commit` checks and can be invoked directly when needed. It is
