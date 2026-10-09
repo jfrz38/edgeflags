@@ -194,6 +194,16 @@ flag behavior inside the application.
 
 ## Phase 6 - Continuous integration
 
+**Status:** In progress since 2026-10-09.
+
+The initial pull request workflow runs application checks and credential-free
+infrastructure validation in separate least-privilege jobs. Mocked Terraform
+apply/plan runs cover the development and production variants, and a local
+integration test verifies the generated Worker binding against Miniflare KV.
+Remote plans remain blocked until shared state and appropriately scoped
+Cloudflare credentials exist; security scanning also remains to be selected
+based on useful provider coverage.
+
 ### Objective
 
 Run the same application and infrastructure validation in GitHub Actions that a

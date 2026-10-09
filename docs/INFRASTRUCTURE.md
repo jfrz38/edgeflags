@@ -37,7 +37,28 @@ preventing development and production state from sharing a file.
 
 Local state is suitable only for the current single-operator learning workflow.
 It must be kept private and backed up. A shared backend and migration procedure
-are required before CI/CD or multiple operators can apply infrastructure.
+are required before CI can publish remote plans or CD and multiple operators can
+apply infrastructure.
+
+Pull request CI therefore does not run a remote plan. An ephemeral runner cannot
+access this local state and would report every configured resource as a create,
+which is not a reviewable representation of the real change.
+
+## Credential-free tests
+
+The shared Terraform root has native tests under
+`infra/modules/environment/tests/`. They apply the development composition and
+plan the production input variant with a mocked Cloudflare provider, verify the
+namespace title and output wiring, and reject malformed account IDs. The mocked
+namespace ID has the same shape expected from Cloudflare. The tests do not
+contact Cloudflare or create remote resources.
+
+`make worker-infra-test` passes that output shape through the same Wrangler
+configuration generator used by `make deploy-dev`. The generated `dev` binding
+is then loaded by the official Cloudflare Vitest plugin, and the Worker performs
+the complete flag lifecycle against Miniflare's isolated local KV. This proves
+the local configuration contract and application wiring; it does not prove
+Cloudflare authentication, remote state, deployment, or edge behavior.
 
 ## Free-tier inventory
 
@@ -76,6 +97,8 @@ environment apply.
 ```bash
 # No Cloudflare credentials required
 make infra-check
+make infra-test
+make worker-infra-test
 
 # Credentials required; ENV defaults to dev
 make infra-plan ENV=dev
@@ -91,3 +114,8 @@ make infra-destroy ENV=dev
 Saved plans, local state, generated backends, provider directories, and
 Terragrunt caches are ignored. Production apply and destroy are intentionally
 blocked by the Make interface.
+
+`make infra-check` includes `make infra-test`; the separate test target is useful
+when iterating on the shared Terraform root. Pull request CI runs
+`make infra-check` and reports the two desired KV namespaces in the GitHub job
+summary. This inventory is not an account-backed plan or cost estimate.

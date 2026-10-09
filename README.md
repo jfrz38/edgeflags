@@ -64,24 +64,44 @@ configuration files without validating their behavior is not enough.
 Significant choices should record their constraints, alternatives, trade-offs,
 and validation method in an Architecture Decision Record.
 
-## Target architecture
+## Architecture and validation path
 
-```text
-Client
-  |
-  v
-Cloudflare edge
-  |
-  v
-TypeScript Worker -----> telemetry path (to be validated)
-  |
-  v
-Cloudflare KV
+```mermaid
+flowchart LR
+  code[Shared Terraform and Worker code]
+
+  subgraph local[Credential-free local validation]
+    tfmock[Terraform test<br/>mock Cloudflare provider]
+    contract[Namespace output contract]
+    generator[Wrangler config generator]
+    worker[Worker on Miniflare]
+    localkv[(Local KV)]
+
+    tfmock --> contract --> generator --> worker --> localkv
+  end
+
+  subgraph remote[Remote target flow]
+    terragrunt[Terragrunt plan and apply]
+    cloudflare[Cloudflare API]
+    output[Real namespace output]
+    deploy[Wrangler deploy]
+    edge[Cloudflare Worker]
+    remotekv[(Cloudflare KV)]
+
+    terragrunt --> cloudflare --> output --> deploy --> edge --> remotekv
+  end
+
+  code --> tfmock
+  code --> terragrunt
 ```
 
-The initial product scope is intentionally small: create, read, delete, and
-evaluate boolean feature flags. Later phases add security, deterministic
-rollouts, targeting, interoperability, and operational experiments.
+Local checks exercise the Terraform output contract, the same configuration
+generator used for deployment, the Worker HTTP lifecycle, and an isolated local
+KV implementation. They never contact Cloudflare. The remote path uses the same
+code but remains blocked until account credentials and shared state are
+available. The initial product scope is intentionally small: create, read,
+delete, and evaluate boolean feature flags. Later phases add security,
+deterministic rollouts, targeting, interoperability, and operational experiments.
 
 See [Architecture](docs/ARCHITECTURE.md) for component responsibilities,
 interfaces, constraints, and planned evolution.
@@ -126,6 +146,7 @@ make format
 make lint
 make typecheck
 make test
+make worker-infra-test
 make infra-check
 make infra-plan ENV=dev
 make infra-plan ENV=prod

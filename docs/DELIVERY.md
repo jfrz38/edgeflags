@@ -1,8 +1,8 @@
 # EdgeFlags Delivery
 
-This document defines the target branch, environment, and delivery model. A
-manual development provisioning and deployment workflow exists; CI and
-deployment automation do not.
+This document defines the branch, environment, and delivery model. Pull request
+CI and a manual development provisioning and deployment workflow exist;
+deployment automation does not.
 
 ## Branch model
 
@@ -46,22 +46,39 @@ constraints.
 
 ## Pull request validation
 
-The target pull request pipeline will run applicable checks such as:
+Pull requests into `develop` or `main` run two independent, read-only jobs:
 
 ```text
-format
-lint
-typecheck
-tests
-security scanning
-terraform formatting and validation
-Terragrunt plan
+Application                             Infrastructure
+-----------                             --------------
+architecture                            Terraform formatting
+lint                                    Terragrunt formatting and validation
+typecheck                               dev and prod configuration validation
+tests                                   mocked Terraform apply/plan for dev and prod
+generated binding + local KV lifecycle
 ```
 
-Not every check will exist from the start. Each phase adds checks only after the
-corresponding local task is working and documented.
+The workflow invokes the same Make targets used locally, installs the toolchain
+from `.mise.toml`, has read-only repository permissions, and receives no
+Cloudflare secrets. Independent jobs make application and infrastructure
+failures visible without serializing unrelated checks.
 
-Infrastructure plans must be reviewable and must not expose secret values.
+The application job generates a temporary `dev` binding from a simulated
+Terraform output and runs the Worker HTTP lifecycle against Miniflare's local KV.
+This uses the deployment generator without granting CI Cloudflare access. The
+infrastructure job independently verifies Terraform composition and Terragrunt
+configuration.
+
+The infrastructure summary reports the statically validated desired inventory.
+It deliberately does not publish a remote plan: local state is unavailable to
+an ephemeral runner, so such a plan would incorrectly report existing resources
+as new. It also does not publish an automated cost estimate because Infracost
+does not price the current Cloudflare KV resources. Cloudflare's documented free
+allowances and the static inventory remain the applicable cost review.
+
+Remote plan comments require a shared backend, narrowly scoped credentials, and
+secret-safe output. Security scanning will be introduced only after selecting a
+scanner with useful Cloudflare coverage and an actionable failure policy.
 
 ## Target deployment flow
 
@@ -130,8 +147,8 @@ Before promotion to `main`:
 - migrations or compatibility concerns must be documented, and
 - smoke-test expectations must be known.
 
-The exact GitHub protection rules and approval policy will be implemented and
-documented with CI/CD rather than assumed to exist now.
+The exact GitHub protection rules and deployment approval policy are not
+configured by the repository and must not be assumed to exist.
 
 ## Credentials and permissions
 

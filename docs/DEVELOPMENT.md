@@ -115,6 +115,7 @@ make format
 make lint
 make typecheck
 make test
+make worker-infra-test
 make infra-init
 make infra-format
 make infra-validate
@@ -138,7 +139,8 @@ maintaining a second set of CI-only command sequences.
 `make architecture` checks the implemented dependency direction: infrastructure
 may depend on application and domain, application may depend on domain, and
 domain remains independent. `make check` runs this check before linting,
-type-checking, and tests.
+type-checking, application tests, the local infrastructure-to-Worker binding
+test, and infrastructure checks.
 
 `make install` also configures the Husky pre-commit hook. The hook delegates to
 `make pre-commit`, which runs the fast lint check across the application. Hooks
@@ -231,6 +233,10 @@ rm -rf app/.wrangler/state
 
 Vitest isolates KV state between tests. Persistence adapter tests use the real
 local Workers KV implementation rather than replacing it with an in-memory map.
+`make worker-infra-test` also supplies a valid simulated Terraform output to the
+deployment configuration generator, loads the generated `dev` configuration in
+Miniflare, and runs the complete HTTP flag lifecycle against local KV. The
+temporary configuration is removed after the test.
 
 ### Remote validation
 
@@ -284,27 +290,34 @@ Tests are divided by the failure they are intended to detect.
 
 ### Unit tests
 
-Vitest will cover pure behavior such as parsing, validation, flag evaluation,
-rollout boundaries, deterministic assignment, and authorization decisions.
+Vitest covers implemented pure behavior such as flag-key validation and use-case
+decisions. Node's built-in test runner covers the Wrangler configuration
+generator and its Terraform output boundary.
 
 ### Worker integration tests
 
-Integration tests will exercise request handling and Cloudflare bindings using
-the official `@cloudflare/vitest-plugin`. Wrangler generates runtime types from
-the committed compatibility date before type-checking so the application types
-match the configured Workers runtime.
+Integration tests exercise request handling and local Cloudflare bindings using
+the official `@cloudflare/vitest-plugin` and Miniflare. The binding contract test
+loads a configuration produced by the same generator used for remote
+development deployment. Wrangler generates runtime types from the committed
+compatibility date before type-checking so application types match the configured
+Workers runtime.
 
 ### Infrastructure checks
 
-Infrastructure validation will include the relevant subset of:
+Infrastructure validation currently includes:
 
 ```text
 terraform fmt
 terraform validate
+terraform test
 terragrunt hcl validate
-tflint
-terragrunt plan
 ```
+
+Native Terraform tests use a mocked Cloudflare provider to apply the development
+composition, plan the production variant, verify outputs, and reject malformed
+account IDs. They create no remote resources. Account-backed Terragrunt plans
+remain a separate credentialed operation.
 
 ### Smoke tests
 
