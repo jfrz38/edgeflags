@@ -18,7 +18,7 @@ install: ## Install application dependencies from the lockfile
 dev: ## Start the Worker locally
 	$(MISE) run dev
 
-.PHONY: architecture format lint typecheck test pre-commit check
+.PHONY: architecture format lint typecheck test worker-infra-test pre-commit check
 architecture: ## Check application architecture boundaries
 	$(MISE) run architecture
 
@@ -34,6 +34,10 @@ typecheck: ## Type-check the Worker and tests
 test: ## Run application tests
 	$(MISE) run test
 
+worker-infra-test: ## Test Terraform output binding with the local Worker and KV runtime
+	$(MISE) exec -- node --test infra/scripts/tests/configure-dev-worker.test.mjs
+	$(MISE) exec -- node infra/scripts/test-dev-worker-binding.mjs
+
 pre-commit: ## Run fast checks before creating a commit
 	$(MAKE) lint
 
@@ -42,6 +46,7 @@ check: ## Run application and infrastructure checks
 	$(MAKE) lint
 	$(MAKE) typecheck
 	$(MAKE) test
+	$(MAKE) worker-infra-test
 	$(MAKE) infra-check
 
 .PHONY: check-infra-env check-mutable-infra-env
@@ -51,7 +56,7 @@ check-infra-env:
 check-mutable-infra-env: check-infra-env
 	@if [ "$(ENV)" != "dev" ]; then printf '%s\n' "Mutable infrastructure commands are limited to ENV=dev"; exit 1; fi
 
-.PHONY: infra-init infra-format infra-validate infra-check infra-plan infra-show infra-apply infra-destroy
+.PHONY: infra-init infra-format infra-validate infra-test infra-check infra-plan infra-show infra-apply infra-destroy
 infra-init: check-infra-env ## Initialize Terragrunt for ENV (dev or prod)
 	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- init
 
@@ -62,12 +67,17 @@ infra-format: ## Format Terraform and Terragrunt files
 infra-validate: infra-init ## Validate infrastructure for ENV (dev or prod)
 	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- validate
 
-infra-check: ## Check Terraform formatting and configuration
+infra-test: ## Test shared infrastructure composition without Cloudflare credentials
+	$(TERRAFORM) -chdir=infra/modules/environment init -backend=false -lockfile=readonly
+	$(TERRAFORM) -chdir=infra/modules/environment test
+
+infra-check: ## Check and test Terraform and Terragrunt configuration
 	$(TERRAFORM) fmt -check -recursive infra
 	$(MISE) exec -- terragrunt --working-dir infra hcl fmt --check
 	$(MISE) exec -- terragrunt --working-dir infra/live hcl validate
 	$(MAKE) infra-validate ENV=dev
 	$(MAKE) infra-validate ENV=prod
+	$(MAKE) infra-test
 
 infra-plan: check-infra-env ## Create a plan for ENV (requires Cloudflare variables)
 	$(MAKE) infra-init ENV=$(ENV)
