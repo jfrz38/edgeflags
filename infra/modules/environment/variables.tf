@@ -1,5 +1,5 @@
 variable "cloudflare_account_id" {
-  description = "Cloudflare account that owns EdgeFlags development resources."
+  description = "Cloudflare account that owns the environment resources."
   type        = string
 
   validation {
@@ -9,7 +9,6 @@ variable "cloudflare_account_id" {
 }
 
 variable "flags_kv_title" {
-  description = "Title of the development feature flag KV namespace."
+  description = "Title of the environment feature flag KV namespace."
   type        = string
-  default     = "edgeflags-dev-flags"
 }

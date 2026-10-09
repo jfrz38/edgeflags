@@ -5,6 +5,7 @@ app/worker-configuration.d.ts
 app/wrangler.dev.toml
 
 infra/**/.terraform/
+infra/**/.terragrunt-cache/
 infra/**/*.tfstate
 infra/**/*.tfstate.*
 infra/**/*.tfplan
