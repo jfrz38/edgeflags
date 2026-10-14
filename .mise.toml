@@ -4,6 +4,7 @@ node = "24.21.0"
 pnpm = "12.8.1"
 terraform = "1.16.5"
 terragrunt = "1.1.6"
+trivy = "0.75.0"
 
 [tasks.dev]
 description = "Start the Worker locally"

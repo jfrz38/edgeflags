@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Install pinned toolchain
         uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
@@ -34,6 +36,7 @@ jobs:
       - name: Check application
         run: |
           make architecture
+          make format-check
           make lint
           make typecheck
           make test
@@ -47,6 +50,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Install pinned toolchain
         uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
@@ -70,3 +75,22 @@ jobs:
             '' \
             'No remote plan or cost estimate is produced. Shared state and Cloudflare credentials are not configured, and Infracost does not price Cloudflare KV resources.' \
             >> "$GITHUB_STEP_SUMMARY"
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install pinned toolchain
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          version: 2026.8.14
+
+      - name: Scan repository
+        run: make security

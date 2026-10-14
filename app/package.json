@@ -8,6 +8,7 @@
     "architecture": "clean-arch check . --source-folder src --config clean-architecture.json",
     "dev": "pnpm run generate-types && wrangler dev",
     "format": "biome format --write .",
+    "format-check": "biome format .",
     "generate-types": "wrangler types",
     "lint": "biome lint .",
     "prepare": "cd .. && husky",
