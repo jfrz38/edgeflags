@@ -5,9 +5,10 @@ the order, scope, and observable outcome of each phase. The
 [README](../README.md) provides only a summary and must not maintain a separate
 phase list.
 
-EdgeFlags has completed **Phases 1 through 3**. Phases 4 and 5 are implemented
-and validated locally; both remain in progress because their remote completion
-criteria require a Cloudflare account that is not currently available.
+EdgeFlags has completed **Phases 1 through 3 and Phase 6**. Phases 4 and 5 are
+implemented and validated locally; both remain in progress because their remote
+completion criteria require a Cloudflare account that is not currently
+available.
 
 ## Planning model
 
@@ -194,15 +195,15 @@ flag behavior inside the application.
 
 ## Phase 6 - Continuous integration
 
-**Status:** In progress since 2026-10-09.
+**Status:** Completed on 2026-10-14.
 
-The initial pull request workflow runs application checks and credential-free
-infrastructure validation in separate least-privilege jobs. Mocked Terraform
-apply/plan runs cover the development and production variants, and a local
-integration test verifies the generated Worker binding against Miniflare KV.
-Remote plans remain blocked until shared state and appropriately scoped
-Cloudflare credentials exist; security scanning also remains to be selected
-based on useful provider coverage.
+The pull request workflow runs application, credential-free infrastructure, and
+security checks in separate least-privilege jobs. Mocked Terraform apply/plan
+runs cover the development and production variants, and a local integration test
+verifies the generated Worker binding against Miniflare KV. Pinned Trivy scans
+dependencies, secrets, and Terraform configuration with an actionable failure
+policy. Remote plans remain deferred until shared state and appropriately scoped
+Cloudflare credentials exist.
 
 ### Objective
 
@@ -220,8 +221,9 @@ developer can run locally.
 ### Completion criteria
 
 A pull request into `develop` reports formatting, linting, type-checking, tests,
-and applicable infrastructure validation without requiring undocumented manual
-steps. Infrastructure plans are reviewable and do not expose secrets.
+security scanning, and applicable credential-free infrastructure validation
+without requiring undocumented manual steps or repository secrets. Remote plans
+will be added only when shared state makes their output accurate and reviewable.
 
 ### Dependencies
 

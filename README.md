@@ -11,11 +11,12 @@ observability, and site reliability engineering.
 
 ## Current status
 
-Phases 1 through 3 are complete. Phases 4 and 5 are implemented and validated
-locally, but their remote completion criteria remain blocked until a suitable
-Cloudflare account and credentials are available. The repository contains a
-reproducible development toolchain, a local KV-backed Worker, and Terragrunt
-composition for distinct `dev` and `prod` infrastructure.
+Phases 1 through 3 and Phase 6 are complete. Phases 4 and 5 are implemented and
+validated locally, but their remote completion criteria remain blocked until a
+suitable Cloudflare account and credentials are available. The repository
+contains a reproducible development toolchain, a local KV-backed Worker,
+Terragrunt composition for distinct `dev` and `prod` infrastructure, and
+credential-free pull request validation.
 
 The remaining infrastructure and broader architecture described in the
 documentation are target outcomes. They will become available incrementally as
@@ -143,10 +144,12 @@ make help
 make dev
 make architecture
 make format
+make format-check
 make lint
 make typecheck
 make test
 make worker-infra-test
+make security
 make infra-check
 make infra-plan ENV=dev
 make infra-plan ENV=prod
@@ -155,8 +158,9 @@ make check
 ```
 
 Infrastructure tasks select `dev` by default and accept `ENV=dev|prod` where
-documented. Security and load-testing tasks will be added through the same
-interface in their corresponding phases. Make delegates tool execution to the
+documented. `make security` scans dependencies, committed content, and
+infrastructure configuration. Load-testing tasks will be added through the same
+interface in their corresponding phase. Make delegates tool execution to the
 versions managed by mise.
 
 Installing dependencies also configures the Husky pre-commit hook. The hook runs

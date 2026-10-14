@@ -46,28 +46,33 @@ constraints.
 
 ## Pull request validation
 
-Pull requests into `develop` or `main` run two independent, read-only jobs:
+Pull requests into `develop` or `main` run three independent, read-only jobs:
 
 ```text
-Application                             Infrastructure
------------                             --------------
-architecture                            Terraform formatting
-lint                                    Terragrunt formatting and validation
-typecheck                               dev and prod configuration validation
-tests                                   mocked Terraform apply/plan for dev and prod
+Application                     Infrastructure                         Security
+-----------                     --------------                         --------
+architecture                    Terraform formatting                   dependency vulnerabilities
+formatting                      Terragrunt formatting and validation   committed secrets
+lint                            dev and prod configuration validation  infrastructure misconfiguration
+typecheck                       mocked Terraform apply/plan
+tests
 generated binding + local KV lifecycle
 ```
 
 The workflow invokes the same Make targets used locally, installs the toolchain
 from `.mise.toml`, has read-only repository permissions, and receives no
-Cloudflare secrets. Independent jobs make application and infrastructure
-failures visible without serializing unrelated checks.
+Cloudflare secrets. Checkout credentials are not persisted for later steps.
+Independent jobs make application, infrastructure, and security failures visible
+without serializing unrelated checks.
 
 The application job generates a temporary `dev` binding from a simulated
 Terraform output and runs the Worker HTTP lifecycle against Miniflare's local KV.
 This uses the deployment generator without granting CI Cloudflare access. The
 infrastructure job independently verifies Terraform composition and Terragrunt
-configuration.
+configuration. The security job uses pinned Trivy tooling and fails on fixable
+HIGH or CRITICAL dependency vulnerabilities, detected secrets, and HIGH or
+CRITICAL Terraform misconfigurations. The dependency policy includes development
+packages because they execute in build and validation workflows.
 
 The infrastructure summary reports the statically validated desired inventory.
 It deliberately does not publish a remote plan: local state is unavailable to
@@ -77,8 +82,7 @@ does not price the current Cloudflare KV resources. Cloudflare's documented free
 allowances and the static inventory remain the applicable cost review.
 
 Remote plan comments require a shared backend, narrowly scoped credentials, and
-secret-safe output. Security scanning will be introduced only after selecting a
-scanner with useful Cloudflare coverage and an actionable failure policy.
+secret-safe output. They remain deferred until those prerequisites exist.
 
 ## Target deployment flow
 
