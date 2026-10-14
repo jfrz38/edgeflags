@@ -1,0 +1,72 @@
+name: Pull Request
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pull-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  application:
+    name: Application
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install pinned toolchain
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          version: 2026.8.14
+
+      - name: Install application dependencies
+        run: make install
+
+      - name: Check application
+        run: |
+          make architecture
+          make lint
+          make typecheck
+          make test
+          make worker-infra-test
+
+  infrastructure:
+    name: Infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install pinned toolchain
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          version: 2026.8.14
+
+      - name: Check infrastructure
+        run: make infra-check
+
+      - name: Summarize infrastructure validation
+        if: always()
+        shell: bash
+        run: |
+          printf '%s\n' \
+            '## Infrastructure validation' \
+            '' \
+            '- Terraform and Terragrunt formatting and validation cover `dev` and `prod`.' \
+            '- Terraform tests apply the development composition and plan production with a mocked Cloudflare provider.' \
+            '- The application job verifies the generated development binding against the Worker and local KV runtime.' \
+            '- Desired inventory: `edgeflags-dev-flags` and `edgeflags-prod-flags` KV namespaces.' \
+            '' \
+            'No remote plan or cost estimate is produced. Shared state and Cloudflare credentials are not configured, and Infracost does not price Cloudflare KV resources.' \
+            >> "$GITHUB_STEP_SUMMARY"

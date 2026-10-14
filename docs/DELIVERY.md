@@ -1,8 +1,8 @@
 # EdgeFlags Delivery
 
-This document defines the target branch, environment, and delivery model. A
-manual development provisioning and deployment workflow exists; CI and
-deployment automation do not.
+This document defines the branch, environment, and delivery model. Pull request
+CI and a manual development provisioning and deployment workflow exist;
+deployment automation does not.
 
 ## Branch model
 
@@ -33,7 +33,7 @@ protection is configured.
 
 ## Environment model
 
-The target infrastructure contains `dev` and `prod` environments.
+The Terragrunt configuration contains distinct `dev` and `prod` environments.
 
 | Environment | Purpose | Branch relationship |
 | --- | --- | --- |
@@ -46,22 +46,39 @@ constraints.
 
 ## Pull request validation
 
-The target pull request pipeline will run applicable checks such as:
+Pull requests into `develop` or `main` run two independent, read-only jobs:
 
 ```text
-format
-lint
-typecheck
-tests
-security scanning
-terraform formatting and validation
-Terragrunt plan
+Application                             Infrastructure
+-----------                             --------------
+architecture                            Terraform formatting
+lint                                    Terragrunt formatting and validation
+typecheck                               dev and prod configuration validation
+tests                                   mocked Terraform apply/plan for dev and prod
+generated binding + local KV lifecycle
 ```
 
-Not every check will exist from the start. Each phase adds checks only after the
-corresponding local task is working and documented.
+The workflow invokes the same Make targets used locally, installs the toolchain
+from `.mise.toml`, has read-only repository permissions, and receives no
+Cloudflare secrets. Independent jobs make application and infrastructure
+failures visible without serializing unrelated checks.
 
-Infrastructure plans must be reviewable and must not expose secret values.
+The application job generates a temporary `dev` binding from a simulated
+Terraform output and runs the Worker HTTP lifecycle against Miniflare's local KV.
+This uses the deployment generator without granting CI Cloudflare access. The
+infrastructure job independently verifies Terraform composition and Terragrunt
+configuration.
+
+The infrastructure summary reports the statically validated desired inventory.
+It deliberately does not publish a remote plan: local state is unavailable to
+an ephemeral runner, so such a plan would incorrectly report existing resources
+as new. It also does not publish an automated cost estimate because Infracost
+does not price the current Cloudflare KV resources. Cloudflare's documented free
+allowances and the static inventory remain the applicable cost review.
+
+Remote plan comments require a shared backend, narrowly scoped credentials, and
+secret-safe output. Security scanning will be introduced only after selecting a
+scanner with useful Cloudflare coverage and an actionable failure policy.
 
 ## Target deployment flow
 
@@ -90,19 +107,20 @@ Whether development deployments happen on every merge to `develop`, through a
 manual workflow, or through another controlled trigger will be decided during
 the continuous deployment phase.
 
-## Current manual development flow
+## Current manual infrastructure flow
 
-The Phase 4 workflow provisions the development KV namespace with Terraform and
-deploys the Worker with Wrangler:
+Terragrunt composes one KV namespace per environment. Plans are available for
+both environments, while mutable commands and Worker deployment remain limited
+to development:
 
 ```text
-make infra-plan
+make infra-plan ENV=dev
         |
         v
 review saved plan
         |
         v
-make infra-apply
+make infra-apply ENV=dev
         |
         v
 make deploy-dev
@@ -111,11 +129,13 @@ make deploy-dev
 manual remote validation
 ```
 
-Terraform owns the KV namespace. Wrangler owns the Worker deployment and reads
-the namespace ID from Terraform output through an ignored generated
+Terraform owns each KV namespace. Wrangler owns the Worker deployment and reads
+the development namespace ID from Terragrunt output through an ignored generated
 configuration. These commands require explicit local credentials and are not
-run by `make check`. There is no automatic deployment trigger or production
-environment in this phase.
+run by `make check`. `make infra-plan ENV=prod` produces the production plan,
+but production apply and deployment are deliberately unavailable until the
+controlled delivery phase. No remote plan or deployment has been demonstrated
+because a Cloudflare account and credentials are not currently available.
 
 ## Promotion requirements
 
@@ -127,8 +147,8 @@ Before promotion to `main`:
 - migrations or compatibility concerns must be documented, and
 - smoke-test expectations must be known.
 
-The exact GitHub protection rules and approval policy will be implemented and
-documented with CI/CD rather than assumed to exist now.
+The exact GitHub protection rules and deployment approval policy are not
+configured by the repository and must not be assumed to exist.
 
 ## Credentials and permissions
 

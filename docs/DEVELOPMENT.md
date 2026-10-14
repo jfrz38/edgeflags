@@ -1,8 +1,7 @@
 # EdgeFlags Development
 
-This document defines the developer experience. Phase 1 established the
-application workflow; infrastructure and operational commands remain target
-outcomes for later phases.
+This document defines the developer experience for the application and the
+currently implemented infrastructure workflow.
 
 ## Goals
 
@@ -87,6 +86,7 @@ The Phase 1 toolchain is pinned to:
 | Husky | 9.1.7 |
 | Clean Architecture Highlighter CLI | 0.1.0 |
 | Terraform | 1.16.5 |
+| Terragrunt | 1.1.6 |
 | Cloudflare Terraform provider | 5.27.0 |
 
 Direct dependencies use exact versions and `app/pnpm-lock.yaml` fixes the full
@@ -115,10 +115,13 @@ make format
 make lint
 make typecheck
 make test
+make worker-infra-test
 make infra-init
 make infra-format
+make infra-validate
 make infra-check
-make infra-plan
+make infra-plan ENV=dev
+make infra-plan ENV=prod
 make pre-commit
 make check
 ```
@@ -129,14 +132,15 @@ routine checks: `make infra-apply`, `make deploy-dev`, and
 `infra-plan`; `infra-destroy` remains interactive. Only run these commands after
 reviewing the target account and expected changes.
 
-Make is the public operational interface and delegates to the tool versions and
-tasks managed by mise. GitHub Actions should call these Make targets instead of
+Make is the public operational interface and delegates to tool versions managed
+by mise. GitHub Actions should call these Make targets instead of
 maintaining a second set of CI-only command sequences.
 
 `make architecture` checks the implemented dependency direction: infrastructure
 may depend on application and domain, application may depend on domain, and
 domain remains independent. `make check` runs this check before linting,
-type-checking, and tests.
+type-checking, application tests, the local infrastructure-to-Worker binding
+test, and infrastructure checks.
 
 `make install` also configures the Husky pre-commit hook. The hook delegates to
 `make pre-commit`, which runs the fast lint check across the application. Hooks
@@ -145,10 +149,11 @@ the same checks must remain part of `make check` and future pull-request gates.
 
 ## Development infrastructure
 
-Terraform configuration lives under `infra/`. The `infra/modules/kv` module
-owns a Cloudflare KV namespace, and `infra/live/dev` instantiates it for the
-development environment. Terraform owns the namespace; Wrangler owns the Worker
-artifact and deployment.
+Terraform configuration lives under `infra/`. The shared
+`infra/modules/environment` root composes `infra/modules/kv`, and Terragrunt
+instantiates it from `infra/live/dev` and `infra/live/prod`. Each environment has
+its own namespace title and local state. Terraform owns the namespaces; Wrangler
+owns Worker artifacts and deployment.
 
 Set credentials in the process environment, never in committed `.tfvars` files:
 
@@ -162,24 +167,36 @@ namespace edits for the selected development account. Wrangler also needs
 permission to deploy Workers scripts. The account identifier is not secret, but
 using an environment variable avoids committing operator-specific values.
 
-Review and apply development infrastructure from the repository root:
+Validate both environments and create an environment-specific plan from the
+repository root:
 
 ```bash
 make infra-check
-make infra-plan
-make infra-show
-make infra-apply
+make infra-plan ENV=dev
+make infra-show ENV=dev
+make infra-plan ENV=prod
+make infra-show ENV=prod
 ```
 
-`make infra-plan` writes an ignored `edgeflags-dev.tfplan`; changes to code,
-variables, credentials, or remote state require a new plan. Applying remote
-changes always requires an explicit command and authorization.
+`ENV` defaults to `dev` and only accepts `dev` or `prod`. Plans are written as
+ignored `edgeflags-<environment>.tfplan` files. Changes to code, inputs,
+credentials, or state require a new plan. Applying and destroying infrastructure
+are currently restricted to `ENV=dev`; production mutation is deferred to the
+controlled delivery work in Phase 7.
 
-This iteration deliberately uses local Terraform state. Files matching
-`*.tfstate`, saved plans, and `.terraform/` are ignored. The operator must keep
-the state private and backed up because losing it breaks Terraform's ownership
+After reviewing the development plan, apply it explicitly:
+
+```bash
+make infra-apply ENV=dev
+```
+
+This iteration deliberately uses separate local Terraform state files at
+`infra/live/<environment>/terraform.tfstate`. Files matching `*.tfstate`, saved
+plans, `.terraform/`, and `.terragrunt-cache/` are ignored. The operator must
+keep state private and backed up because losing it breaks Terraform's ownership
 record. A shared backend must be selected before multi-operator or automated
-applies.
+applies. See [Infrastructure](INFRASTRUCTURE.md) for composition and free-tier
+details.
 
 After apply, deploy the Worker with the provisioned binding:
 
@@ -188,7 +205,7 @@ make deploy-dev
 ```
 
 The deployment target generates ignored `app/wrangler.dev.toml` from the local
-Wrangler configuration and Terraform output, then deploys `edgeflags-dev` with
+Wrangler configuration and Terragrunt output, then deploys `edgeflags-dev` with
 the `FLAGS_KV` binding. Do not edit or commit the generated file. This path does
 not change `make dev`: local execution continues to use local KV and cannot fall
 back to Cloudflare resources.
@@ -204,7 +221,7 @@ make infra-destroy
 Wrangler provides the `FLAGS_KV` binding declared in `app/wrangler.toml`.
 `make dev` and the Worker integration tests use local KV storage and do not
 require Cloudflare credentials or a remote namespace. The binding is explicitly
-local and has no namespace ID until Phase 4 provisions one.
+local and never falls back to a remote namespace.
 
 Wrangler keeps local development state under the ignored `app/.wrangler/`
 directory. To reset all local Wrangler state from the repository root, stop the
@@ -216,6 +233,10 @@ rm -rf app/.wrangler/state
 
 Vitest isolates KV state between tests. Persistence adapter tests use the real
 local Workers KV implementation rather than replacing it with an in-memory map.
+`make worker-infra-test` also supplies a valid simulated Terraform output to the
+deployment configuration generator, loads the generated `dev` configuration in
+Miniflare, and runs the complete HTTP flag lifecycle against local KV. The
+temporary configuration is removed after the test.
 
 ### Remote validation
 
@@ -232,7 +253,9 @@ After applying the development namespace and deploying the Worker:
 Use a unique key such as `phase4-<UTC timestamp>`. Record the commit, account,
 Worker deployment identifier, public URL, time, Terraform plan summary, and
 observed responses without recording credentials. Use `wrangler kv key get`
-against the namespace ID from `terraform output flags_kv_namespace_id` to
+against the namespace ID from
+`terragrunt --working-dir infra/live/dev run --tf-path terraform -- output -raw
+flags_kv_namespace_id` to
 confirm the stored JSON has `version: 1`, then delete the disposable key through
 the API. Eventual consistency may require bounded retries; it must not be
 reported as a strong read-after-write guarantee.
@@ -267,26 +290,34 @@ Tests are divided by the failure they are intended to detect.
 
 ### Unit tests
 
-Vitest will cover pure behavior such as parsing, validation, flag evaluation,
-rollout boundaries, deterministic assignment, and authorization decisions.
+Vitest covers implemented pure behavior such as flag-key validation and use-case
+decisions. Node's built-in test runner covers the Wrangler configuration
+generator and its Terraform output boundary.
 
 ### Worker integration tests
 
-Integration tests will exercise request handling and Cloudflare bindings using
-the official `@cloudflare/vitest-plugin`. Wrangler generates runtime types from
-the committed compatibility date before type-checking so the application types
-match the configured Workers runtime.
+Integration tests exercise request handling and local Cloudflare bindings using
+the official `@cloudflare/vitest-plugin` and Miniflare. The binding contract test
+loads a configuration produced by the same generator used for remote
+development deployment. Wrangler generates runtime types from the committed
+compatibility date before type-checking so application types match the configured
+Workers runtime.
 
 ### Infrastructure checks
 
-Infrastructure validation will include the relevant subset of:
+Infrastructure validation currently includes:
 
 ```text
 terraform fmt
 terraform validate
-tflint
-terragrunt plan
+terraform test
+terragrunt hcl validate
 ```
+
+Native Terraform tests use a mocked Cloudflare provider to apply the development
+composition, plan the production variant, verify outputs, and reject malformed
+account IDs. They create no remote resources. Account-backed Terragrunt plans
+remain a separate credentialed operation.
 
 ### Smoke tests
 

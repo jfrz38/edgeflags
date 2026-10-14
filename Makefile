@@ -1,6 +1,10 @@
 .DEFAULT_GOAL := help
 
 MISE ?= mise
+ENV ?= dev
+INFRA_ENVIRONMENTS := dev prod
+TERRAFORM := $(MISE) exec -- terraform
+TERRAGRUNT := $(MISE) exec -- terragrunt
 
 .PHONY: help
 help: ## Show available targets
@@ -14,7 +18,7 @@ install: ## Install application dependencies from the lockfile
 dev: ## Start the Worker locally
 	$(MISE) run dev
 
-.PHONY: architecture format lint typecheck test pre-commit check
+.PHONY: architecture format lint typecheck test worker-infra-test pre-commit check
 architecture: ## Check application architecture boundaries
 	$(MISE) run architecture
 
@@ -30,6 +34,10 @@ typecheck: ## Type-check the Worker and tests
 test: ## Run application tests
 	$(MISE) run test
 
+worker-infra-test: ## Test Terraform output binding with the local Worker and KV runtime
+	$(MISE) exec -- node --test infra/scripts/tests/configure-dev-worker.test.mjs
+	$(MISE) exec -- node infra/scripts/test-dev-worker-binding.mjs
+
 pre-commit: ## Run fast checks before creating a commit
 	$(MAKE) lint
 
@@ -38,35 +46,54 @@ check: ## Run application and infrastructure checks
 	$(MAKE) lint
 	$(MAKE) typecheck
 	$(MAKE) test
+	$(MAKE) worker-infra-test
 	$(MAKE) infra-check
 
-.PHONY: infra-init infra-format infra-check infra-plan infra-show infra-apply infra-destroy
-infra-init: ## Initialize Terraform for the development environment
-	$(MISE) run infra-init
+.PHONY: check-infra-env check-mutable-infra-env
+check-infra-env:
+	@if [ "$(ENV)" != "dev" ] && [ "$(ENV)" != "prod" ]; then printf '%s\n' "ENV must be one of: $(INFRA_ENVIRONMENTS)"; exit 1; fi
 
-infra-format: ## Format Terraform files
-	$(MISE) run infra-format
+check-mutable-infra-env: check-infra-env
+	@if [ "$(ENV)" != "dev" ]; then printf '%s\n' "Mutable infrastructure commands are limited to ENV=dev"; exit 1; fi
 
-infra-check: ## Check Terraform formatting and configuration
-	$(MISE) run infra-format-check
-	$(MAKE) infra-init
-	$(MISE) run infra-validate
+.PHONY: infra-init infra-format infra-validate infra-test infra-check infra-plan infra-show infra-apply infra-destroy
+infra-init: check-infra-env ## Initialize Terragrunt for ENV (dev or prod)
+	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- init
 
-infra-plan: ## Create the development plan (requires Cloudflare variables)
-	$(MAKE) infra-init
-	$(MISE) run infra-plan
+infra-format: ## Format Terraform and Terragrunt files
+	$(TERRAFORM) fmt -recursive infra
+	$(MISE) exec -- terragrunt --working-dir infra hcl fmt
 
-infra-show: ## Show the saved development plan
-	$(MISE) run infra-show
+infra-validate: infra-init ## Validate infrastructure for ENV (dev or prod)
+	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- validate
 
-infra-apply: ## Apply the saved development plan
-	$(MISE) run infra-apply
+infra-test: ## Test shared infrastructure composition without Cloudflare credentials
+	$(TERRAFORM) -chdir=infra/modules/environment init -backend=false -lockfile=readonly
+	$(TERRAFORM) -chdir=infra/modules/environment test
 
-infra-destroy: ## Destroy development resources after confirmation
-	$(MISE) run infra-destroy
+infra-check: ## Check and test Terraform and Terragrunt configuration
+	$(TERRAFORM) fmt -check -recursive infra
+	$(MISE) exec -- terragrunt --working-dir infra hcl fmt --check
+	$(MISE) exec -- terragrunt --working-dir infra/live hcl validate
+	$(MAKE) infra-validate ENV=dev
+	$(MAKE) infra-validate ENV=prod
+	$(MAKE) infra-test
+
+infra-plan: check-infra-env ## Create a plan for ENV (requires Cloudflare variables)
+	$(MAKE) infra-init ENV=$(ENV)
+	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- plan -out="$(abspath infra/live/$(ENV)/edgeflags-$(ENV).tfplan)"
+
+infra-show: check-infra-env ## Show the saved plan for ENV
+	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- show "$(abspath infra/live/$(ENV)/edgeflags-$(ENV).tfplan)"
+
+infra-apply: check-mutable-infra-env ## Apply the reviewed development plan
+	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- apply "$(abspath infra/live/dev/edgeflags-dev.tfplan)"
+
+infra-destroy: check-mutable-infra-env ## Destroy development resources after confirmation
+	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- destroy
 
 .PHONY: configure-dev deploy-dev
-configure-dev: ## Generate the ignored Wrangler dev configuration from Terraform state
+configure-dev: ## Generate the ignored Wrangler dev configuration from Terragrunt-managed state
 	$(MISE) exec -- node infra/scripts/configure-dev-worker.mjs
 
 deploy-dev: configure-dev ## Deploy the Worker and bind the provisioned development KV

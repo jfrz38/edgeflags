@@ -3,8 +3,10 @@ app/.wrangler/
 app/coverage/
 app/worker-configuration.d.ts
 app/wrangler.dev.toml
+app/.wrangler.binding-test.toml
 
 infra/**/.terraform/
+infra/**/.terragrunt-cache/
 infra/**/*.tfstate
 infra/**/*.tfstate.*
 infra/**/*.tfplan

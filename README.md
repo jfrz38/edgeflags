@@ -11,11 +11,11 @@ observability, and site reliability engineering.
 
 ## Current status
 
-Phases 1 through 3 are complete, and Phase 4 implementation is in progress. The
-repository contains a reproducible development toolchain, a local KV-backed
-Worker, and validated Terraform configuration for a remote development KV
-namespace. Applying the infrastructure and validating a deployed Worker still
-require a suitable Cloudflare account and credentials.
+Phases 1 through 3 are complete. Phases 4 and 5 are implemented and validated
+locally, but their remote completion criteria remain blocked until a suitable
+Cloudflare account and credentials are available. The repository contains a
+reproducible development toolchain, a local KV-backed Worker, and Terragrunt
+composition for distinct `dev` and `prod` infrastructure.
 
 The remaining infrastructure and broader architecture described in the
 documentation are target outcomes. They will become available incrementally as
@@ -64,24 +64,44 @@ configuration files without validating their behavior is not enough.
 Significant choices should record their constraints, alternatives, trade-offs,
 and validation method in an Architecture Decision Record.
 
-## Target architecture
+## Architecture and validation path
 
-```text
-Client
-  |
-  v
-Cloudflare edge
-  |
-  v
-TypeScript Worker -----> telemetry path (to be validated)
-  |
-  v
-Cloudflare KV
+```mermaid
+flowchart LR
+  code[Shared Terraform and Worker code]
+
+  subgraph local[Credential-free local validation]
+    tfmock[Terraform test<br/>mock Cloudflare provider]
+    contract[Namespace output contract]
+    generator[Wrangler config generator]
+    worker[Worker on Miniflare]
+    localkv[(Local KV)]
+
+    tfmock --> contract --> generator --> worker --> localkv
+  end
+
+  subgraph remote[Remote target flow]
+    terragrunt[Terragrunt plan and apply]
+    cloudflare[Cloudflare API]
+    output[Real namespace output]
+    deploy[Wrangler deploy]
+    edge[Cloudflare Worker]
+    remotekv[(Cloudflare KV)]
+
+    terragrunt --> cloudflare --> output --> deploy --> edge --> remotekv
+  end
+
+  code --> tfmock
+  code --> terragrunt
 ```
 
-The initial product scope is intentionally small: create, read, delete, and
-evaluate boolean feature flags. Later phases add security, deterministic
-rollouts, targeting, interoperability, and operational experiments.
+Local checks exercise the Terraform output contract, the same configuration
+generator used for deployment, the Worker HTTP lifecycle, and an isolated local
+KV implementation. They never contact Cloudflare. The remote path uses the same
+code but remains blocked until account credentials and shared state are
+available. The initial product scope is intentionally small: create, read,
+delete, and evaluate boolean feature flags. Later phases add security,
+deterministic rollouts, targeting, interoperability, and operational experiments.
 
 See [Architecture](docs/ARCHITECTURE.md) for component responsibilities,
 interfaces, constraints, and planned evolution.
@@ -92,6 +112,7 @@ interfaces, constraints, and planned evolution.
 - [API](docs/API.md): implemented HTTP operations, responses, and errors
 - [Development](docs/DEVELOPMENT.md): target local workflow, tools, and tests
 - [Delivery](docs/DELIVERY.md): branches, environments, CI, and deployments
+- [Infrastructure](docs/INFRASTRUCTURE.md): environment composition, state, and free-tier inventory
 - [Roadmap](docs/ROADMAP.md): canonical implementation order and outcomes
 - [Experiments](docs/EXPERIMENTS.md): planned experiments and result template
 - [Architecture decisions](docs/adr/README.md): ADR policy and records
@@ -125,14 +146,18 @@ make format
 make lint
 make typecheck
 make test
+make worker-infra-test
 make infra-check
+make infra-plan ENV=dev
+make infra-plan ENV=prod
 make pre-commit
 make check
 ```
 
-Infrastructure, security, and load-testing tasks will be added through the same
-interface in their corresponding phases. The Make targets delegate tool
-execution to the versions and tasks managed by mise.
+Infrastructure tasks select `dev` by default and accept `ENV=dev|prod` where
+documented. Security and load-testing tasks will be added through the same
+interface in their corresponding phases. Make delegates tool execution to the
+versions managed by mise.
 
 Installing dependencies also configures the Husky pre-commit hook. The hook runs
 the fast `make pre-commit` checks and can be invoked directly when needed. It is

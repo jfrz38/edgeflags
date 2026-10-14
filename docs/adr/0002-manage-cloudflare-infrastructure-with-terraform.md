@@ -77,3 +77,7 @@ that this single-operator development iteration does not require.
 - Select a shared state backend before automated or multi-operator applies.
 - Add `prod` composition during the environments phase, not by copying this root.
 - Move deployment orchestration into CI/CD only after its local workflow works.
+
+Phase 5 implemented the environment-composition follow-up in
+[ADR 0003](0003-compose-environments-with-terragrunt.md) without changing the
+resource ownership or local-state decisions in this record.
