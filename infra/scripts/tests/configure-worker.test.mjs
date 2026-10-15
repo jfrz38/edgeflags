@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  configureDevWorker,
-  renderDevWorkerConfig,
-} from "../configure-dev-worker.mjs";
+  configureWorker,
+  renderWorkerConfig,
+  validateEnvironment,
+} from "../configure-worker.mjs";
 
 const namespaceId = "abcdef0123456789abcdef0123456789";
 const baseConfig = `name = "edgeflags"
@@ -15,8 +16,8 @@ binding = "FLAGS_KV"
 remote = false
 `;
 
-test("renders the development binding without changing the base configuration", () => {
-  const config = renderDevWorkerConfig(baseConfig, namespaceId);
+test("renders an environment binding without changing the base configuration", () => {
+  const config = renderWorkerConfig(baseConfig, namespaceId, "dev");
 
   assert.match(config, /^name = "edgeflags"/);
   assert.match(config, /\[env\.dev\]\nname = "edgeflags-dev"/);
@@ -24,9 +25,21 @@ test("renders the development binding without changing the base configuration", 
   assert.match(config, /\[\[env\.dev\.kv_namespaces\]\][\s\S]*remote = false/);
 });
 
+test("renders the production environment independently", () => {
+  const config = renderWorkerConfig(baseConfig, namespaceId, "prod");
+
+  assert.match(config, /\[env\.prod\]\nname = "edgeflags-prod"/);
+  assert.match(config, /\[\[env\.prod\.kv_namespaces\]\]/);
+  assert.doesNotMatch(config, /env\.dev/);
+});
+
+test("rejects an unknown environment", () => {
+  assert.throws(() => validateEnvironment("staging"), /dev, prod/);
+});
+
 test("rejects an invalid namespace output", () => {
   assert.throws(
-    () => renderDevWorkerConfig(baseConfig, "not-a-cloudflare-id"),
+    () => renderWorkerConfig(baseConfig, "not-a-cloudflare-id", "dev"),
     /invalid Cloudflare KV namespace ID/,
   );
 });
@@ -34,7 +47,7 @@ test("rejects an invalid namespace output", () => {
 test("writes configuration from the supplied Terraform output contract", async () => {
   let written;
 
-  await configureDevWorker({
+  await configureWorker("prod", {
     getNamespaceId: () => namespaceId,
     read: async () => baseConfig,
     write: async (destination, contents, encoding) => {
@@ -47,13 +60,14 @@ test("writes configuration from the supplied Terraform output contract", async (
   assert.equal(written.destination, "generated.toml");
   assert.equal(written.encoding, "utf8");
   assert.match(written.contents, new RegExp(`id = "${namespaceId}"`));
+  assert.match(written.contents, /env\.prod/);
 });
 
 test("does not write when reading Terraform output fails", async () => {
   let wrote = false;
 
   await assert.rejects(
-    configureDevWorker({
+    configureWorker("dev", {
       getNamespaceId: () => {
         throw new Error("terraform output failed");
       },

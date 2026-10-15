@@ -237,6 +237,14 @@ against a newly deployed release.
 
 ## Phase 7 - Continuous deployment
 
+**Status:** In progress since 2026-10-15.
+
+Development CD, protected remote plans, R2 state, smoke tests, and recovery
+controls are implemented behind explicit activation variables. R2 bootstrap,
+state migration, lock/recovery validation, and GitHub environment configuration
+must be completed before enabling them. Production deployment remains blocked
+until Phase 8 protects the public mutation API.
+
 ### Objective
 
 Automate controlled environment deployment and verify each deployment through a

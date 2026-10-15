@@ -129,7 +129,7 @@ make check
 ```
 
 Mutable infrastructure and deployment commands are intentionally separate from
-routine checks: `make infra-apply`, `make deploy-dev`, and
+routine checks: `make infra-apply`, `make deploy ENV=dev`, and
 `make infra-destroy`. `infra-apply` consumes the saved plan created by
 `infra-plan`; `infra-destroy` remains interactive. Only run these commands after
 reviewing the target account and expected changes.
@@ -157,24 +157,29 @@ the same checks must remain part of `make check` and future pull-request gates.
 Terraform configuration lives under `infra/`. The shared
 `infra/modules/environment` root composes `infra/modules/kv`, and Terragrunt
 instantiates it from `infra/live/dev` and `infra/live/prod`. Each environment has
-its own namespace title and local state. Terraform owns the namespaces; Wrangler
-owns Worker artifacts and deployment.
+its own namespace title and private R2 state bucket. Terraform owns the
+namespaces; Wrangler owns Worker artifacts and deployment.
 
 Set credentials in the process environment, never in committed `.tfvars` files:
 
 ```bash
 export CLOUDFLARE_API_TOKEN="..."
+export CLOUDFLARE_ACCOUNT_ID="..."
 export TF_VAR_cloudflare_account_id="..."
+export AWS_ACCESS_KEY_ID="..."
+export AWS_SECRET_ACCESS_KEY="..."
 ```
 
 A root `.env` file is ignored for operators who source these values into their
 shell, but repository commands do not load it automatically. Never force-add it
 to Git.
 
-The token needs the smallest account-scoped permissions that allow Workers KV
-namespace edits for the selected development account. Wrangler also needs
-permission to deploy Workers scripts. The account identifier is not secret, but
-using an environment variable avoids committing operator-specific values.
+The Cloudflare token needs only the permissions required by the operation:
+Workers KV namespace edits for Terraform, Worker script edits for deployment, or
+R2 object edits for backup. R2 S3 access keys are separate credentials scoped to
+one state bucket. The account identifier is not secret. Both account variables
+contain the same value because the provider and backend consume different
+conventional names.
 
 Validate both environments and create an environment-specific plan from the
 repository root:
@@ -187,11 +192,12 @@ make infra-plan ENV=prod
 make infra-show ENV=prod
 ```
 
-`ENV` defaults to `dev` and only accepts `dev` or `prod`. Plans are written as
+`ENV` defaults to `dev` and only accepts `dev` or `prod`. Remote operations also
+require the R2 backend variables shown above. Plans are written as
 ignored `edgeflags-<environment>.tfplan` files. Changes to code, inputs,
 credentials, or state require a new plan. Applying and destroying infrastructure
-are currently restricted to `ENV=dev`; production mutation is deferred to the
-controlled delivery work in Phase 7.
+are restricted to `ENV=dev`; production mutation remains blocked until API
+security and controlled production delivery are available.
 
 After reviewing the development plan, apply it explicitly:
 
@@ -199,18 +205,16 @@ After reviewing the development plan, apply it explicitly:
 make infra-apply ENV=dev
 ```
 
-This iteration deliberately uses separate local Terraform state files at
-`infra/live/<environment>/terraform.tfstate`. Files matching `*.tfstate`, saved
-plans, `.terraform/`, and `.terragrunt-cache/` are ignored. The operator must
-keep state private and backed up because losing it breaks Terraform's ownership
-record. A shared backend must be selected before multi-operator or automated
-applies. See [Infrastructure](INFRASTRUCTURE.md) for composition and free-tier
-details.
+Terragrunt is configured for separate private R2 buckets. Before its first use,
+follow the bootstrap and migration sequence in
+[Infrastructure](INFRASTRUCTURE.md). The original local state, local backups,
+saved plans, `.terraform/`, and `.terragrunt-cache/` remain ignored and private.
+Do not enable remote plans or CD until migration and locking have been verified.
 
 After apply, deploy the Worker with the provisioned binding:
 
 ```bash
-make deploy-dev
+make deploy ENV=dev
 ```
 
 The deployment target generates ignored `app/wrangler.dev.toml` from the local
@@ -247,17 +251,19 @@ deployment configuration generator, loads the generated `dev` configuration in
 Miniflare, and runs the complete HTTP flag lifecycle against local KV. The
 temporary configuration is removed after the test.
 
+The generator also supports `make configure-worker ENV=prod` so its configuration
+contract can be tested, but `make deploy ENV=prod` and `make smoke ENV=prod` are
+rejected before they can contact Cloudflare.
+
 ### Remote validation
 
-After applying the development namespace and deploying the Worker:
+After applying the development namespace and deploying the Worker, run
+`make smoke ENV=dev BASE_URL=https://...`. The automated check:
 
-1. Deploy the same Worker code with `FLAGS_KV` bound to that namespace.
-2. Create, read, evaluate, replace, and delete a uniquely named disposable flag.
-3. Confirm persisted values use the documented versioned representation without
-   exposing credentials or values through Terraform outputs.
-4. Record the account, environment, deployment identifier, time, and observed
-   result.
-5. Remove the disposable flag.
+1. Verifies the root health response.
+2. Creates a uniquely named disposable flag.
+3. Reads and evaluates it with bounded retries for eventual consistency.
+4. Removes it even when a later assertion fails.
 
 Use a unique key such as `phase4-<UTC timestamp>`. Record the commit, account,
 Worker deployment identifier, public URL, time, Terraform plan summary, and
@@ -288,10 +294,10 @@ Local secrets should use mechanisms supported by Wrangler and mise. CI/CD
 secrets should use GitHub environment or repository secrets with the narrowest
 practical permissions.
 
-Implemented infrastructure uses `CLOUDFLARE_API_TOKEN` and
-`TF_VAR_cloudflare_account_id`. Future variable names will be documented when
-their consuming component is implemented. Example files must contain
-placeholders, never usable credentials.
+Implemented infrastructure also uses `CLOUDFLARE_ACCOUNT_ID`,
+`AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` for R2 state. CI maps separately
+scoped GitHub environment secrets onto these conventional names. Example files
+must contain placeholders, never usable credentials.
 
 ## Testing strategy
 

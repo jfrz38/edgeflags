@@ -11,10 +11,11 @@ observability, and site reliability engineering.
 
 ## Current status
 
-Phases 1 through 6 are complete. The repository contains a reproducible
-development toolchain, a local and remotely validated KV-backed Worker,
-Terragrunt composition for distinct `dev` and `prod` infrastructure, and
-credential-free pull request validation.
+Phases 1 through 6 are complete and Phase 7 is in progress. The repository
+contains a reproducible development toolchain, a local and remotely validated
+KV-backed Worker, Terragrunt composition for distinct `dev` and `prod`
+infrastructure, credential-free pull request validation, and dormant development
+CD ready for R2 state migration and GitHub environment activation.
 
 The remaining infrastructure and broader architecture described in the
 documentation are target outcomes. They will become available incrementally as
@@ -80,6 +81,7 @@ flowchart LR
   end
 
   subgraph remote[Remote target flow]
+    state[(R2 Terraform state)]
     terragrunt[Terragrunt plan and apply]
     cloudflare[Cloudflare API]
     output[Real namespace output]
@@ -87,7 +89,7 @@ flowchart LR
     edge[Cloudflare Worker]
     remotekv[(Cloudflare KV)]
 
-    terragrunt --> cloudflare --> output --> deploy --> edge --> remotekv
+    state --> terragrunt --> cloudflare --> output --> deploy --> edge --> remotekv
   end
 
   code --> tfmock
@@ -96,12 +98,12 @@ flowchart LR
 
 Local checks exercise the Terraform output contract, the same configuration
 generator used for deployment, the Worker HTTP lifecycle, and an isolated local
-KV implementation. They never contact Cloudflare. The same remote development
-path has been validated manually against Cloudflare; shared state and scoped CI
-credentials are still required before it can be automated. The initial product
-scope is intentionally small: create, read, delete, and evaluate boolean feature
-flags. Later phases add security, deterministic rollouts, targeting,
-interoperability, and operational experiments.
+KV implementation. They never contact Cloudflare. The remote development path
+has been validated manually; its automated workflow remains disabled until R2
+state migration, locking, recovery, and scoped GitHub credentials are verified.
+The initial product scope is intentionally small: create, read, delete, and
+evaluate boolean feature flags. Later phases add security, deterministic
+rollouts, targeting, interoperability, and operational experiments.
 
 See [Architecture](docs/ARCHITECTURE.md) for component responsibilities,
 interfaces, constraints, and planned evolution.

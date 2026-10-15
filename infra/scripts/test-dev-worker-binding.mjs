@@ -2,7 +2,7 @@ import { readFile, unlink, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { renderDevWorkerConfig } from "./configure-dev-worker.mjs";
+import { renderWorkerConfig } from "./configure-worker.mjs";
 
 const appDirectory = new URL("../../app/", import.meta.url);
 const sourcePath = new URL("wrangler.toml", appDirectory);
@@ -14,7 +14,7 @@ try {
   const baseConfig = await readFile(sourcePath, "utf8");
   await writeFile(
     testConfigPath,
-    renderDevWorkerConfig(baseConfig, namespaceId),
+    renderWorkerConfig(baseConfig, namespaceId, "dev"),
     "utf8",
   );
 
