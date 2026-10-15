@@ -71,9 +71,9 @@ single-operator local iteration.
 
 - [x] Format and validate Terragrunt HCL locally.
 - [x] Initialize and validate Terraform for `dev` and `prod` locally.
-- [ ] Review a `dev` plan against a suitable Cloudflare account.
-- [ ] Recreate the development namespace through Terragrunt.
-- [ ] Review a `prod` plan and confirm account-level free-tier usage.
+- [x] Review a `dev` plan against a suitable Cloudflare account.
+- [x] Recreate the development namespace through Terragrunt.
+- [x] Review a `prod` plan and confirm account-level free-tier usage.
 
 ## Follow-up
 

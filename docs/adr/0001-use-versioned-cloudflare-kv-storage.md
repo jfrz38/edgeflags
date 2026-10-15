@@ -72,7 +72,7 @@ capabilities not required by the current boolean flag model.
 
 - [x] Exercise save, read, replace, and delete through local Workers KV.
 - [x] Verify corrupt and unsupported values produce a generic internal error.
-- [ ] Validate a remotely provisioned namespace in Phase 4.
+- [x] Validate a remotely provisioned namespace in Phase 4.
 - [ ] Measure cross-location propagation and stale reads in Phase 15.
 
 ## Follow-up

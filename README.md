@@ -11,10 +11,8 @@ observability, and site reliability engineering.
 
 ## Current status
 
-Phases 1 through 3 and Phase 6 are complete. Phases 4 and 5 are implemented and
-validated locally, but their remote completion criteria remain blocked until a
-suitable Cloudflare account and credentials are available. The repository
-contains a reproducible development toolchain, a local KV-backed Worker,
+Phases 1 through 6 are complete. The repository contains a reproducible
+development toolchain, a local and remotely validated KV-backed Worker,
 Terragrunt composition for distinct `dev` and `prod` infrastructure, and
 credential-free pull request validation.
 
@@ -98,11 +96,12 @@ flowchart LR
 
 Local checks exercise the Terraform output contract, the same configuration
 generator used for deployment, the Worker HTTP lifecycle, and an isolated local
-KV implementation. They never contact Cloudflare. The remote path uses the same
-code but remains blocked until account credentials and shared state are
-available. The initial product scope is intentionally small: create, read,
-delete, and evaluate boolean feature flags. Later phases add security,
-deterministic rollouts, targeting, interoperability, and operational experiments.
+KV implementation. They never contact Cloudflare. The same remote development
+path has been validated manually against Cloudflare; shared state and scoped CI
+credentials are still required before it can be automated. The initial product
+scope is intentionally small: create, read, delete, and evaluate boolean feature
+flags. Later phases add security, deterministic rollouts, targeting,
+interoperability, and operational experiments.
 
 See [Architecture](docs/ARCHITECTURE.md) for component responsibilities,
 interfaces, constraints, and planned evolution.

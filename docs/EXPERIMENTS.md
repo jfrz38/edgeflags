@@ -4,7 +4,7 @@ EdgeFlags is intended to produce repeatable observations, not only implementatio
 milestones. This document is the catalog and recording format for those
 experiments.
 
-No experiment has been executed yet.
+The first remote infrastructure experiment was completed on 2026-10-15.
 
 ## Experiment lifecycle
 
@@ -63,12 +63,16 @@ can be run or when planning it is itself part of an active phase.
 | Inject 500 ms of latency | Phase 14 | Does the latency SLI reflect controlled degradation? |
 | Inject evaluation failures | Phase 14 | Does the availability SLI reflect controlled failures? |
 | Generate a traffic spike with k6 | Phase 14 | How does the service and telemetry react to a spike? |
-| Destroy and recreate development infrastructure | Phase 5 | Is the environment reproducible through Terragrunt? |
-| Compare local and deployed Worker behavior | Phase 4 | Do bindings and evaluation behave consistently? |
 | Evaluate OpenFeature and OFREP compatibility | Phase 11 | Which interoperability boundary fits the service? |
 
 The phase numbers indicate the earliest expected implementation point. They may
 change if a prerequisite or provider limitation is discovered.
+
+## Completed catalog
+
+| Record | Related phases | Conclusion |
+| --- | --- | --- |
+| [EXP-0001: Cloudflare remote validation](experiments/0001-cloudflare-remote-validation.md) | Phases 4 and 5 | The manual development workflow is reproducible and matches local flag behavior; the production plan is isolated and reviewable. |
 
 ## Evidence
 

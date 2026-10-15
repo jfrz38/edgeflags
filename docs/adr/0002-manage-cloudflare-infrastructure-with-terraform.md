@@ -68,9 +68,9 @@ that this single-operator development iteration does not require.
 ## Validation / experiments
 
 - [x] Format and validate the Terraform configuration locally.
-- [ ] Review and apply a plan against a development Cloudflare account.
-- [ ] Exercise the deployed Worker against the provisioned KV namespace.
-- [ ] Confirm the development resources can be destroyed and recreated.
+- [x] Review and apply a plan against a development Cloudflare account.
+- [x] Exercise the deployed Worker against the provisioned KV namespace.
+- [x] Confirm the development resources can be destroyed and recreated.
 
 ## Follow-up
 

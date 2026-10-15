@@ -138,8 +138,10 @@ the development namespace ID from Terragrunt output through an ignored generated
 configuration. These commands require explicit local credentials and are not
 run by `make check`. `make infra-plan ENV=prod` produces the production plan,
 but production apply and deployment are deliberately unavailable until the
-controlled delivery phase. No remote plan or deployment has been demonstrated
-because a Cloudflare account and credentials are not currently available.
+controlled delivery phase. On 2026-10-15, the manual workflow provisioned,
+deployed, exercised, destroyed, and recreated development successfully; a real
+production plan was also reviewed without being applied. This validates the
+manual path but does not provide shared state or automated deployment.
 
 ## Promotion requirements
 

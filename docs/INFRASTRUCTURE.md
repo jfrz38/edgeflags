@@ -60,6 +60,29 @@ the complete flag lifecycle against Miniflare's isolated local KV. This proves
 the local configuration contract and application wiring; it does not prove
 Cloudflare authentication, remote state, deployment, or edge behavior.
 
+## Remote validation
+
+On 2026-10-15, the documented single-operator workflow was validated against a
+Cloudflare account from repository commit `8bc74b2`:
+
+1. The development plan was reviewed and applied through Terragrunt.
+2. `make deploy-dev` deployed the Worker with the provisioned `FLAGS_KV`
+   binding.
+3. A disposable flag was created, read, evaluated, replaced, and deleted through
+   the public Worker endpoint.
+4. Direct KV inspection confirmed the persisted representation used `version: 1`.
+5. The development resources were destroyed, planned, applied, deployed, and
+   exercised again successfully.
+6. The production plan was reviewed and contained the expected isolated
+   namespace; it was not applied.
+
+This demonstrates remote wiring and reproducibility for the current manual
+workflow. Deployment identifiers, account identifiers, credentials, and the
+ephemeral test key are not committed. Local state still prevents safe CI plans
+or multi-operator applies, and no cross-location consistency claim follows from
+this validation. See [EXP-0001](experiments/0001-cloudflare-remote-validation.md)
+for the recorded procedure and limitations.
+
 ## Free-tier inventory
 
 The default desired remote inventory is two Workers KV namespaces, one for each
@@ -86,11 +109,10 @@ further operations of an exhausted type fail.
 
 The committed configuration provisions only two empty namespaces, so its static
 inventory does not itself exceed the listed storage or operation allowances.
-Actual traffic from both environments shares those allowances. This is a design
-assessment, not account-backed proof: no Cloudflare account is currently
-available to inspect plan eligibility, existing account consumption, or remote
-behavior. Recheck the linked pricing and the target account before every first
-environment apply.
+Actual traffic from both environments shares those allowances. The development
+apply and production plan were reviewed against the target account on 2026-10-15
+and fit the listed free allowances. Recheck current pricing and account
+consumption before every first environment apply.
 
 ## Commands
 
