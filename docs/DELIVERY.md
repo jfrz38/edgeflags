@@ -1,8 +1,9 @@
 # EdgeFlags Delivery
 
 This document defines the branch, environment, and delivery model. Pull request
-CI and a manual development provisioning and deployment workflow exist;
-deployment automation does not.
+CI, protected remote development plans, and development deployment automation
+are implemented. Remote operations remain disabled until R2 and GitHub
+environments are bootstrapped and validated.
 
 ## Branch model
 
@@ -37,7 +38,7 @@ The Terragrunt configuration contains distinct `dev` and `prod` environments.
 
 | Environment | Purpose | Branch relationship |
 | --- | --- | --- |
-| `dev` | Integration and deployed experiments | Associated with `develop`; the exact deployment trigger is TBD in Phase 7 |
+| `dev` | Integration and deployed experiments | Deploys each integrated push to `develop` after activation |
 | `prod` | Stable release behavior | Deployed from `main` after promotion |
 
 Separating these environments is intentionally educational even though the
@@ -75,14 +76,15 @@ CRITICAL Terraform misconfigurations. The dependency policy includes development
 packages because they execute in build and validation workflows.
 
 The infrastructure summary reports the statically validated desired inventory.
-It deliberately does not publish a remote plan: local state is unavailable to
-an ephemeral runner, so such a plan would incorrectly report existing resources
-as new. It also does not publish an automated cost estimate because Infracost
-does not price the current Cloudflare KV resources. Cloudflare's documented free
-allowances and the static inventory remain the applicable cost review.
+These credential-free jobs do not contact Cloudflare. They also do not publish
+an automated cost estimate because Infracost does not price the current
+Cloudflare resources. Cloudflare's documented free allowances and the static
+inventory remain the applicable cost review.
 
-Remote plan comments require a shared backend, narrowly scoped credentials, and
-secret-safe output. They remain deferred until those prerequisites exist.
+The workflow contains a protected remote development plan job. It runs only for
+same-repository pull requests after `R2_STATE_ENABLED=true` is configured, uses
+the `dev-plan` GitHub environment, and emits only create/update/replace/delete
+counts. The saved plan is not published or reused after merge.
 
 ## Target deployment flow
 
@@ -107,41 +109,37 @@ Worker deployment
 smoke tests
 ```
 
-Whether development deployments happen on every merge to `develop`, through a
-manual workflow, or through another controlled trigger will be decided during
-the continuous deployment phase.
+Development deploys on every push integrated into `develop` and supports a
+controlled `workflow_dispatch` rerun. The workflow remains dormant until
+`DEV_CD_ENABLED=true` is configured. It serializes all development deployments
+without cancelling one in progress.
 
-## Current manual infrastructure flow
+## Development deployment flow
 
-Terragrunt composes one KV namespace per environment. Plans are available for
-both environments, while mutable commands and Worker deployment remain limited
-to development:
+After R2 migration and GitHub environment activation, development follows:
 
 ```text
-make infra-plan ENV=dev
+push to develop or controlled rerun
         |
         v
-review saved plan
+required checks
         |
         v
-make infra-apply ENV=dev
+R2 state backup
         |
         v
-make deploy-dev
+new saved plan -> exact plan apply
         |
         v
-manual remote validation
+Worker deploy -> disposable-flag smoke test
 ```
 
-Terraform owns each KV namespace. Wrangler owns the Worker deployment and reads
-the development namespace ID from Terragrunt output through an ignored generated
-configuration. These commands require explicit local credentials and are not
-run by `make check`. `make infra-plan ENV=prod` produces the production plan,
-but production apply and deployment are deliberately unavailable until the
-controlled delivery phase. On 2026-10-15, the manual workflow provisioned,
-deployed, exercised, destroyed, and recreated development successfully; a real
-production plan was also reviewed without being applied. This validates the
-manual path but does not provide shared state or automated deployment.
+Terraform owns each KV namespace. Wrangler owns Worker deployment and reads the
+development namespace ID from Terragrunt output through an ignored generated
+configuration. Production apply and deployment remain unavailable until API
+authentication exists. The workflows are committed before activation so the R2
+migration, lock behavior, environment protections, and credentials can be
+verified without triggering a partial deployment.
 
 ## Promotion requirements
 
@@ -166,19 +164,24 @@ CI/CD credentials should:
 - avoid plaintext Terraform variables and state exposure, and
 - support rotation without changing application code.
 
+`dev-plan` uses bucket-scoped R2 credentials and a read-only Cloudflare plan
+token. `dev` uses its own R2 credentials, a Cloudflare infrastructure/deployment
+token, and a separate R2 backup token. `CLOUDFLARE_ACCOUNT_ID` and `DEV_BASE_URL`
+are non-secret environment variables. No production deployment credentials are
+configured during this iteration.
+
 Production deployment should use a protected GitHub environment if that feature
 fits the selected repository plan.
 
 ## Failure and recovery
 
-Deployment is not complete merely because an automation job succeeds. The
-delivery phase must define:
+The deployment chain stops at the first failed prerequisite: backup failure
+prevents planning, plan failure prevents apply, apply failure prevents Worker
+deployment, and deploy failure prevents smoke testing. A smoke failure marks the
+deployment failed and preserves the evidence in the workflow summary.
 
-- what smoke-test failure does to the workflow,
-- how the previous Worker version can be restored,
-- how infrastructure apply failures are surfaced,
-- which operations require manual intervention, and
-- how a failed promotion is documented.
-
-Rollback behavior remains TBD until deployable application and infrastructure
-artifacts exist.
+Worker recovery is an explicit redeploy of a previously successful commit after
+checking compatibility with the applied infrastructure. Terraform is never
+rolled back automatically because reversing infrastructure can destroy data or
+worsen a partial apply. Operators inspect remote state and Cloudflare before
+retrying or applying a forward fix. `infra-destroy` is never run by CI.

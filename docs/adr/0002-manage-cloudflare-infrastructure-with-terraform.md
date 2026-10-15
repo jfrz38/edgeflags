@@ -81,3 +81,7 @@ that this single-operator development iteration does not require.
 Phase 5 implemented the environment-composition follow-up in
 [ADR 0003](0003-compose-environments-with-terragrunt.md) without changing the
 resource ownership or local-state decisions in this record.
+
+[ADR 0004](0004-store-terraform-state-in-cloudflare-r2.md) later superseded the
+local-state decision while preserving the Terraform and Wrangler ownership
+boundary.
