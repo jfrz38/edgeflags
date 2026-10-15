@@ -167,6 +167,10 @@ export CLOUDFLARE_API_TOKEN="..."
 export TF_VAR_cloudflare_account_id="..."
 ```
 
+A root `.env` file is ignored for operators who source these values into their
+shell, but repository commands do not load it automatically. Never force-add it
+to Git.
+
 The token needs the smallest account-scoped permissions that allow Workers KV
 namespace edits for the selected development account. Wrangler also needs
 permission to deploy Workers scripts. The account identifier is not secret, but

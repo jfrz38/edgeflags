@@ -44,7 +44,7 @@ worker-infra-test: ## Test Terraform output binding with the local Worker and KV
 
 security: ## Scan dependencies, secrets, and infrastructure for actionable findings
 	$(TRIVY) filesystem --disable-telemetry --no-progress --scanners vuln --include-dev-deps --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 app/pnpm-lock.yaml
-	$(TRIVY) filesystem --disable-telemetry --no-progress --scanners secret --exit-code 1 .
+	$(TRIVY) filesystem --disable-telemetry --no-progress --scanners secret --skip-files .env --exit-code 1 .
 	$(TRIVY) filesystem --disable-telemetry --no-progress --scanners misconfig --severity HIGH,CRITICAL --exit-code 1 infra
 
 pre-commit: ## Run fast checks before creating a commit
