@@ -3,6 +3,7 @@
 MISE ?= mise
 ENV ?= dev
 INFRA_ENVIRONMENTS := dev prod
+RCLONE := $(MISE) exec -- rclone
 TERRAFORM := $(MISE) exec -- terraform
 TERRAGRUNT := $(MISE) exec -- terragrunt
 TRIVY := $(MISE) exec -- trivy
@@ -61,7 +62,7 @@ check: ## Run application and infrastructure checks
 	$(MAKE) infra-check
 	$(MAKE) security
 
-.PHONY: check-infra-env check-mutable-infra-env check-state-env check-cloudflare-account check-cloudflare-token
+.PHONY: check-infra-env check-mutable-infra-env check-state-env check-state-backup-env check-cloudflare-account check-cloudflare-token
 check-infra-env:
 	@if [ "$(ENV)" != "dev" ] && [ "$(ENV)" != "prod" ]; then printf '%s\n' "ENV must be one of: $(INFRA_ENVIRONMENTS)"; exit 1; fi
 
@@ -70,6 +71,9 @@ check-mutable-infra-env: check-infra-env
 
 check-state-env: check-infra-env
 	@if [ -z "$$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$$AWS_ACCESS_KEY_ID" ] || [ -z "$$AWS_SECRET_ACCESS_KEY" ]; then printf '%s\n' "CLOUDFLARE_ACCOUNT_ID, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY are required for remote state"; exit 1; fi
+
+check-state-backup-env:
+	@if [ -z "$$R2_BACKUP_ACCESS_KEY_ID" ] || [ -z "$$R2_BACKUP_SECRET_ACCESS_KEY" ]; then printf '%s\n' "R2_BACKUP_ACCESS_KEY_ID and R2_BACKUP_SECRET_ACCESS_KEY are required for state backups"; exit 1; fi
 
 check-cloudflare-account:
 	@if [ -z "$$CLOUDFLARE_ACCOUNT_ID" ]; then printf '%s\n' "CLOUDFLARE_ACCOUNT_ID is required"; exit 1; fi
@@ -140,8 +144,13 @@ infra-state-backup-local: check-mutable-infra-env ## Copy the pre-migration loca
 infra-state-migrate: check-mutable-infra-env check-state-env ## Migrate the existing development state to R2
 	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- init -migrate-state
 
-infra-state-backup: check-mutable-infra-env check-state-env check-cloudflare-token ## Snapshot remote development state to a timestamped R2 object
+infra-state-backup: check-mutable-infra-env check-state-env check-state-backup-env ## Snapshot remote development state to a timestamped R2 object
 	@$(MAKE) infra-init ENV=dev
 	@tmp_file=$$(mktemp); trap 'rm -f "$$tmp_file"' EXIT; \
 	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- state pull > "$$tmp_file" && \
-	$(MISE) exec -- pnpm --dir app exec wrangler r2 object put "edgeflags-terraform-state-dev/backups/$$(date -u +%Y%m%dT%H%M%SZ).tfstate" --file "$$tmp_file" --remote
+	RCLONE_S3_PROVIDER=Cloudflare \
+	RCLONE_S3_ACCESS_KEY_ID="$$R2_BACKUP_ACCESS_KEY_ID" \
+	RCLONE_S3_SECRET_ACCESS_KEY="$$R2_BACKUP_SECRET_ACCESS_KEY" \
+	RCLONE_S3_ENDPOINT="https://$$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com" \
+	$(RCLONE) copyto "$$tmp_file" ":s3:edgeflags-terraform-state-dev/backups/$$(date -u +%Y%m%dT%H%M%SZ).tfstate" \
+		--s3-no-check-bucket

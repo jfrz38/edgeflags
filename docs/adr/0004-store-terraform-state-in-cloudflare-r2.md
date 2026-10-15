@@ -46,6 +46,12 @@ checkout. Before each automated development apply, copy the current state to a
 timestamped `backups/` object in the same environment bucket. Recovery is an
 explicit operator action; CI never pushes or edits state manually.
 
+Upload automated backups through R2's S3-compatible API with independent,
+bucket-scoped Object Read & Write credentials. Do not use Wrangler's REST object
+operation for this purpose: Cloudflare does not support bucket-scoped object
+tokens on that API, and granting account-wide R2 administration solely for
+backups would exceed the required privilege.
+
 Pull-request plans and development deployments remain disabled until the state
 migration, lock test, GitHub environments, and credentials are complete.
 Production state and credentials remain isolated, and production apply stays
