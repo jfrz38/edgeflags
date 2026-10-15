@@ -6,6 +6,7 @@ INFRA_ENVIRONMENTS := dev prod
 TERRAFORM := $(MISE) exec -- terraform
 TERRAGRUNT := $(MISE) exec -- terragrunt
 TRIVY := $(MISE) exec -- trivy
+VALIDATION_CACHE := $(abspath infra/.terragrunt-cache/validation/$(ENV))
 
 .PHONY: help
 help: ## Show available targets
@@ -39,7 +40,7 @@ test: ## Run application tests
 	$(MISE) run test
 
 worker-infra-test: ## Test Terraform output binding with the local Worker and KV runtime
-	$(MISE) exec -- node --test infra/scripts/tests/configure-dev-worker.test.mjs
+	$(MISE) exec -- node --test infra/scripts/tests/*.test.mjs
 	$(MISE) exec -- node infra/scripts/test-dev-worker-binding.mjs
 
 security: ## Scan dependencies, secrets, and infrastructure for actionable findings
@@ -60,23 +61,33 @@ check: ## Run application and infrastructure checks
 	$(MAKE) infra-check
 	$(MAKE) security
 
-.PHONY: check-infra-env check-mutable-infra-env
+.PHONY: check-infra-env check-mutable-infra-env check-state-env check-cloudflare-account check-cloudflare-token
 check-infra-env:
 	@if [ "$(ENV)" != "dev" ] && [ "$(ENV)" != "prod" ]; then printf '%s\n' "ENV must be one of: $(INFRA_ENVIRONMENTS)"; exit 1; fi
 
 check-mutable-infra-env: check-infra-env
 	@if [ "$(ENV)" != "dev" ]; then printf '%s\n' "Mutable infrastructure commands are limited to ENV=dev"; exit 1; fi
 
-.PHONY: infra-init infra-format infra-validate infra-test infra-check infra-plan infra-show infra-apply infra-destroy
-infra-init: check-infra-env ## Initialize Terragrunt for ENV (dev or prod)
+check-state-env: check-infra-env
+	@if [ -z "$$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$$AWS_ACCESS_KEY_ID" ] || [ -z "$$AWS_SECRET_ACCESS_KEY" ]; then printf '%s\n' "CLOUDFLARE_ACCOUNT_ID, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY are required for remote state"; exit 1; fi
+
+check-cloudflare-account:
+	@if [ -z "$$CLOUDFLARE_ACCOUNT_ID" ]; then printf '%s\n' "CLOUDFLARE_ACCOUNT_ID is required"; exit 1; fi
+
+check-cloudflare-token:
+	@if [ -z "$$CLOUDFLARE_API_TOKEN" ]; then printf '%s\n' "CLOUDFLARE_API_TOKEN is required"; exit 1; fi
+
+.PHONY: infra-init infra-format infra-validate infra-test infra-check infra-plan infra-plan-summary infra-show infra-apply infra-destroy infra-state-bootstrap infra-state-backup-local infra-state-migrate infra-state-backup
+infra-init: check-state-env ## Initialize the remote R2 backend for ENV (dev or prod)
 	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- init
 
 infra-format: ## Format Terraform and Terragrunt files
 	$(TERRAFORM) fmt -recursive infra
 	$(MISE) exec -- terragrunt --working-dir infra hcl fmt
 
-infra-validate: infra-init ## Validate infrastructure for ENV (dev or prod)
-	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- validate
+infra-validate: check-infra-env ## Validate infrastructure for ENV without contacting the remote backend
+	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --download-dir "$(VALIDATION_CACHE)" --tf-path terraform -- init -backend=false
+	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --download-dir "$(VALIDATION_CACHE)" --no-auto-init --tf-path terraform -- validate
 
 infra-test: ## Test shared infrastructure composition without Cloudflare credentials
 	$(TERRAFORM) -chdir=infra/modules/environment init -backend=false -lockfile=readonly
@@ -94,6 +105,10 @@ infra-plan: check-infra-env ## Create a plan for ENV (requires Cloudflare variab
 	$(MAKE) infra-init ENV=$(ENV)
 	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- plan -out="$(abspath infra/live/$(ENV)/edgeflags-$(ENV).tfplan)"
 
+infra-plan-summary: check-infra-env ## Write a secret-safe Markdown summary of the saved plan
+	@test -f "infra/live/$(ENV)/edgeflags-$(ENV).tfplan" || { printf '%s\n' "No saved plan exists for ENV=$(ENV)"; exit 1; }
+	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- show -json "$(abspath infra/live/$(ENV)/edgeflags-$(ENV).tfplan)" | $(MISE) exec -- node infra/scripts/summarize-plan.mjs
+
 infra-show: check-infra-env ## Show the saved plan for ENV
 	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- show "$(abspath infra/live/$(ENV)/edgeflags-$(ENV).tfplan)"
 
@@ -103,9 +118,30 @@ infra-apply: check-mutable-infra-env ## Apply the reviewed development plan
 infra-destroy: check-mutable-infra-env ## Destroy development resources after confirmation
 	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- destroy
 
-.PHONY: configure-dev deploy-dev
-configure-dev: ## Generate the ignored Wrangler dev configuration from Terragrunt-managed state
-	$(MISE) exec -- node infra/scripts/configure-dev-worker.mjs
+.PHONY: configure-worker deploy smoke
+configure-worker: check-infra-env ## Generate ignored Wrangler configuration for ENV
+	$(MISE) exec -- node infra/scripts/configure-worker.mjs "$(ENV)"
 
-deploy-dev: configure-dev ## Deploy the Worker and bind the provisioned development KV
-	$(MISE) exec -- pnpm --dir app exec wrangler deploy --env dev --config wrangler.dev.toml
+deploy: check-mutable-infra-env configure-worker ## Deploy the development Worker with its provisioned KV binding
+	$(MISE) exec -- pnpm --dir app exec wrangler deploy --env "$(ENV)" --config "wrangler.$(ENV).toml"
+
+smoke: check-mutable-infra-env ## Exercise health and a disposable flag against BASE_URL
+	@if [ -z "$(BASE_URL)" ]; then printf '%s\n' "BASE_URL is required"; exit 1; fi
+	BASE_URL="$(BASE_URL)" $(MISE) exec -- node infra/scripts/smoke-worker.mjs
+
+infra-state-bootstrap: check-infra-env check-cloudflare-account check-cloudflare-token ## Create the R2 state bucket for ENV (one-time bootstrap)
+	$(MISE) exec -- pnpm --dir app exec wrangler r2 bucket create "edgeflags-terraform-state-$(ENV)"
+
+infra-state-backup-local: check-mutable-infra-env ## Copy the pre-migration local development state to an ignored backup
+	@test -f "infra/live/dev/terraform.tfstate" || { printf '%s\n' "No local development state exists"; exit 1; }
+	@mkdir -p "infra/live/dev/state-backups"
+	@cp "infra/live/dev/terraform.tfstate" "infra/live/dev/state-backups/pre-r2-$$(date -u +%Y%m%dT%H%M%SZ).tfstate"
+
+infra-state-migrate: check-mutable-infra-env check-state-env ## Migrate the existing development state to R2
+	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- init -migrate-state
+
+infra-state-backup: check-mutable-infra-env check-state-env check-cloudflare-token ## Snapshot remote development state to a timestamped R2 object
+	@$(MAKE) infra-init ENV=dev
+	@tmp_file=$$(mktemp); trap 'rm -f "$$tmp_file"' EXIT; \
+	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- state pull > "$$tmp_file" && \
+	$(MISE) exec -- pnpm --dir app exec wrangler r2 object put "edgeflags-terraform-state-dev/backups/$$(date -u +%Y%m%dT%H%M%SZ).tfstate" --file "$$tmp_file" --remote

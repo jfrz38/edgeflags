@@ -5,6 +5,7 @@ app/.wrangler/
 app/coverage/
 app/worker-configuration.d.ts
 app/wrangler.dev.toml
+app/wrangler.prod.toml
 app/.wrangler.binding-test.toml
 
 infra/**/.terraform/
@@ -16,3 +17,4 @@ infra/**/*.tfvars
 infra/**/*.tfvars.json
 infra/**/.terraform.tfstate.lock.info
 infra/**/crash.log
+infra/**/state-backups/
