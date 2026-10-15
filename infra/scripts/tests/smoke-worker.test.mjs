@@ -9,174 +9,251 @@ const jsonResponse = (body, status = 200) =>
     headers: { "Content-Type": "application/json" },
   });
 
-test("checks health and a disposable flag lifecycle", async () => {
+function createScriptedFetch(script) {
   const requests = [];
-  const fetch = async (input, init = {}) => {
-    const url = new URL(input);
-    const method = init.method ?? "GET";
-    requests.push(`${method} ${url.pathname}`);
 
-    if (url.pathname === "/") {
-      return jsonResponse({ service: "edgeflags", status: "ok" });
-    }
-    if (method === "PUT") {
-      return jsonResponse({ key: "smoke-check", enabled: true }, 201);
-    }
-    if (method === "DELETE") return new Response(null, { status: 204 });
-    if (url.pathname.startsWith("/evaluate/")) {
-      return jsonResponse({ key: "smoke-check", value: true });
-    }
-    return jsonResponse({ key: "smoke-check", enabled: true });
+  return {
+    fetch: async (input, init = {}) => {
+      const expected = script.shift();
+      const url = new URL(input);
+      const method = init.method ?? "GET";
+      const request = `${method} ${url.pathname}`;
+      requests.push(request);
+
+      assert.ok(expected, `Unexpected request: ${request}`);
+      assert.equal(request, `${expected.method} ${expected.path}`);
+      return expected.response;
+    },
+    assertComplete() {
+      assert.deepEqual(script, []);
+    },
+    requests,
   };
+}
+
+test("checks health and a disposable flag lifecycle", async () => {
+  const scriptedFetch = createScriptedFetch([
+    {
+      method: "GET",
+      path: "/",
+      response: jsonResponse({ service: "edgeflags", status: "ok" }),
+    },
+    {
+      method: "PUT",
+      path: "/flags/smoke-check",
+      response: jsonResponse({ key: "smoke-check", enabled: true }, 201),
+    },
+    {
+      method: "GET",
+      path: "/flags/smoke-check",
+      response: jsonResponse({ key: "smoke-check", enabled: true }),
+    },
+    {
+      method: "GET",
+      path: "/evaluate/smoke-check",
+      response: jsonResponse({ key: "smoke-check", value: true }),
+    },
+    {
+      method: "DELETE",
+      path: "/flags/smoke-check",
+      response: new Response(null, { status: 204 }),
+    },
+  ]);
 
   await smokeWorker({
     baseUrl: "https://dev.example.test",
     key: "smoke-check",
-    fetch,
+    fetch: scriptedFetch.fetch,
     sleep: async () => {},
   });
 
-  assert.deepEqual(requests, [
+  assert.deepEqual(scriptedFetch.requests, [
     "GET /",
     "PUT /flags/smoke-check",
     "GET /flags/smoke-check",
     "GET /evaluate/smoke-check",
     "DELETE /flags/smoke-check",
   ]);
+  scriptedFetch.assertComplete();
 });
 
 test("retries reads that have not propagated", async () => {
-  let reads = 0;
   let sleeps = 0;
-  const fetch = async (input, init = {}) => {
-    const url = new URL(input);
-    const method = init.method ?? "GET";
-
-    if (url.pathname === "/") {
-      return jsonResponse({ service: "edgeflags", status: "ok" });
-    }
-    if (method === "PUT") return jsonResponse({}, 201);
-    if (method === "DELETE") return new Response(null, { status: 204 });
-    if (url.pathname.startsWith("/evaluate/")) {
-      return jsonResponse({ key: "smoke-retry", value: true });
-    }
-
-    reads += 1;
-    return reads === 1
-      ? jsonResponse({ error: { code: "FLAG_NOT_FOUND" } }, 404)
-      : jsonResponse({ key: "smoke-retry", enabled: true });
-  };
+  const scriptedFetch = createScriptedFetch([
+    {
+      method: "GET",
+      path: "/",
+      response: jsonResponse({ service: "edgeflags", status: "ok" }),
+    },
+    {
+      method: "PUT",
+      path: "/flags/smoke-retry",
+      response: jsonResponse({}, 201),
+    },
+    {
+      method: "GET",
+      path: "/flags/smoke-retry",
+      response: jsonResponse({ error: { code: "FLAG_NOT_FOUND" } }, 404),
+    },
+    {
+      method: "GET",
+      path: "/flags/smoke-retry",
+      response: jsonResponse({ key: "smoke-retry", enabled: true }),
+    },
+    {
+      method: "GET",
+      path: "/evaluate/smoke-retry",
+      response: jsonResponse({ key: "smoke-retry", value: true }),
+    },
+    {
+      method: "DELETE",
+      path: "/flags/smoke-retry",
+      response: new Response(null, { status: 204 }),
+    },
+  ]);
 
   await smokeWorker({
     baseUrl: "https://dev.example.test",
     key: "smoke-retry",
-    fetch,
+    fetch: scriptedFetch.fetch,
     sleep: async () => {
       sleeps += 1;
     },
   });
 
-  assert.equal(reads, 2);
   assert.equal(sleeps, 1);
+  scriptedFetch.assertComplete();
 });
 
 test("cleans up a created flag when evaluation fails", async () => {
-  let cleaned = false;
-  const fetch = async (input, init = {}) => {
-    const url = new URL(input);
-    const method = init.method ?? "GET";
-
-    if (url.pathname === "/") {
-      return jsonResponse({ service: "edgeflags", status: "ok" });
-    }
-    if (method === "PUT") return jsonResponse({}, 201);
-    if (method === "DELETE") {
-      cleaned = true;
-      return new Response(null, { status: 204 });
-    }
-    if (url.pathname.startsWith("/evaluate/")) {
-      return jsonResponse({ error: { code: "FLAG_NOT_FOUND" } }, 404);
-    }
-    return jsonResponse({ key: "smoke-failure", enabled: true });
-  };
+  const scriptedFetch = createScriptedFetch([
+    {
+      method: "GET",
+      path: "/",
+      response: jsonResponse({ service: "edgeflags", status: "ok" }),
+    },
+    {
+      method: "PUT",
+      path: "/flags/smoke-failure",
+      response: jsonResponse({}, 201),
+    },
+    {
+      method: "GET",
+      path: "/flags/smoke-failure",
+      response: jsonResponse({ key: "smoke-failure", enabled: true }),
+    },
+    {
+      method: "GET",
+      path: "/evaluate/smoke-failure",
+      response: jsonResponse({ error: { code: "FLAG_NOT_FOUND" } }, 404),
+    },
+    {
+      method: "GET",
+      path: "/evaluate/smoke-failure",
+      response: jsonResponse({ error: { code: "FLAG_NOT_FOUND" } }, 404),
+    },
+    {
+      method: "DELETE",
+      path: "/flags/smoke-failure",
+      response: new Response(null, { status: 204 }),
+    },
+  ]);
 
   await assert.rejects(
     smokeWorker({
       baseUrl: "https://dev.example.test",
       key: "smoke-failure",
       attempts: 2,
-      fetch,
+      fetch: scriptedFetch.fetch,
       sleep: async () => {},
     }),
     /Flag evaluation failed/,
   );
-  assert.equal(cleaned, true);
+  scriptedFetch.assertComplete();
 });
 
 test("retries cleanup after a transient failure", async () => {
-  let cleanupAttempts = 0;
-  const fetch = async (input, init = {}) => {
-    const url = new URL(input);
-    const method = init.method ?? "GET";
-
-    if (url.pathname === "/") {
-      return jsonResponse({ service: "edgeflags", status: "ok" });
-    }
-    if (method === "PUT") return jsonResponse({}, 201);
-    if (method === "DELETE") {
-      cleanupAttempts += 1;
-      return new Response(null, {
-        status: cleanupAttempts === 1 ? 503 : 204,
-      });
-    }
-    if (url.pathname.startsWith("/evaluate/")) {
-      return jsonResponse({ key: "smoke-cleanup", value: true });
-    }
-    return jsonResponse({ key: "smoke-cleanup", enabled: true });
-  };
+  const scriptedFetch = createScriptedFetch([
+    {
+      method: "GET",
+      path: "/",
+      response: jsonResponse({ service: "edgeflags", status: "ok" }),
+    },
+    {
+      method: "PUT",
+      path: "/flags/smoke-cleanup",
+      response: jsonResponse({}, 201),
+    },
+    {
+      method: "GET",
+      path: "/flags/smoke-cleanup",
+      response: jsonResponse({ key: "smoke-cleanup", enabled: true }),
+    },
+    {
+      method: "GET",
+      path: "/evaluate/smoke-cleanup",
+      response: jsonResponse({ key: "smoke-cleanup", value: true }),
+    },
+    {
+      method: "DELETE",
+      path: "/flags/smoke-cleanup",
+      response: new Response(null, { status: 503 }),
+    },
+    {
+      method: "DELETE",
+      path: "/flags/smoke-cleanup",
+      response: new Response(null, { status: 204 }),
+    },
+  ]);
 
   await smokeWorker({
     baseUrl: "https://dev.example.test",
     key: "smoke-cleanup",
-    fetch,
+    fetch: scriptedFetch.fetch,
     sleep: async () => {},
   });
 
-  assert.equal(cleanupAttempts, 2);
+  scriptedFetch.assertComplete();
 });
 
 test("attempts cleanup after an unexpected create response", async () => {
-  let cleaned = false;
-  const fetch = async (input, init = {}) => {
-    const url = new URL(input);
-    const method = init.method ?? "GET";
-
-    if (url.pathname === "/") {
-      return jsonResponse({ service: "edgeflags", status: "ok" });
-    }
-    if (method === "PUT") return jsonResponse({}, 502);
-    if (method === "DELETE") {
-      cleaned = true;
-      return new Response(null, { status: 204 });
-    }
-    throw new Error("Unexpected request");
-  };
+  const scriptedFetch = createScriptedFetch([
+    {
+      method: "GET",
+      path: "/",
+      response: jsonResponse({ service: "edgeflags", status: "ok" }),
+    },
+    {
+      method: "PUT",
+      path: "/flags/smoke-create-failure",
+      response: jsonResponse({}, 502),
+    },
+    {
+      method: "DELETE",
+      path: "/flags/smoke-create-failure",
+      response: new Response(null, { status: 204 }),
+    },
+  ]);
 
   await assert.rejects(
     smokeWorker({
       baseUrl: "https://dev.example.test",
       key: "smoke-create-failure",
-      fetch,
+      fetch: scriptedFetch.fetch,
       sleep: async () => {},
     }),
     /Flag creation failed/,
   );
-  assert.equal(cleaned, true);
+  scriptedFetch.assertComplete();
 });
 
 test("rejects non-HTTPS endpoints before making a request", async () => {
+  const fetch = () => {
+    throw new Error("Fetch should not be called");
+  };
+
   await assert.rejects(
-    smokeWorker({ baseUrl: "http://dev.example.test" }),
+    smokeWorker({ baseUrl: "http://dev.example.test", fetch }),
     /must use HTTPS/,
   );
 });
