@@ -37,6 +37,11 @@ Development and production use separate `edgeflags-terraform-state-dev` and
 lockfiles. The endpoint uses `CLOUDFLARE_ACCOUNT_ID`; R2 credentials use
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 
+Automated development backups use separate bucket-scoped S3 credentials exposed
+as `R2_BACKUP_ACCESS_KEY_ID` and `R2_BACKUP_SECRET_ACCESS_KEY`. The backup upload
+uses R2's S3-compatible API because bucket-scoped Object Read & Write tokens are
+not supported by the Cloudflare REST API used by `wrangler r2 object put`.
+
 The buckets are bootstrap resources: the environment root cannot create the
 bucket required to initialize itself. `make infra-state-bootstrap ENV=dev|prod`
 creates each bucket reproducibly with Wrangler. Creating R2 S3 credentials is a
@@ -52,7 +57,9 @@ a concurrency test confirms R2 lock behavior.
 R2 does not provide the state-version history assumed by some S3 workflows.
 `make infra-state-backup` therefore uploads the current development state to a
 timestamped object under the bucket's `backups/` prefix. CD stops before planning
-or applying if this backup fails. Backup objects require explicit retention.
+or applying if this backup fails. The state pull uses the backend credentials;
+only the upload receives the dedicated backup credentials. Backup objects require
+explicit retention.
 
 ## Credential-free tests
 

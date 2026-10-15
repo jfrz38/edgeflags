@@ -70,7 +70,8 @@ jobs:
 
       - name: Back up development state
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STATE_BACKUP_API_TOKEN }}
+          R2_BACKUP_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+          R2_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
         run: make infra-state-backup ENV=dev
 
       - name: Plan development infrastructure
