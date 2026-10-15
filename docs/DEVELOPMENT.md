@@ -112,10 +112,12 @@ make help
 make dev
 make architecture
 make format
+make format-check
 make lint
 make typecheck
 make test
 make worker-infra-test
+make security
 make infra-init
 make infra-format
 make infra-validate
@@ -138,9 +140,12 @@ maintaining a second set of CI-only command sequences.
 
 `make architecture` checks the implemented dependency direction: infrastructure
 may depend on application and domain, application may depend on domain, and
-domain remains independent. `make check` runs this check before linting,
-type-checking, application tests, the local infrastructure-to-Worker binding
-test, and infrastructure checks.
+domain remains independent. `make check` runs this check before formatting,
+linting, type-checking, application tests, the local infrastructure-to-Worker
+binding test, infrastructure checks, and security scanning. `make security`
+uses the pinned Trivy version to reject fixable HIGH or CRITICAL dependency
+vulnerabilities, detected secrets, and HIGH or CRITICAL infrastructure
+misconfigurations.
 
 `make install` also configures the Husky pre-commit hook. The hook delegates to
 `make pre-commit`, which runs the fast lint check across the application. Hooks
@@ -161,6 +166,10 @@ Set credentials in the process environment, never in committed `.tfvars` files:
 export CLOUDFLARE_API_TOKEN="..."
 export TF_VAR_cloudflare_account_id="..."
 ```
+
+A root `.env` file is ignored for operators who source these values into their
+shell, but repository commands do not load it automatically. Never force-add it
+to Git.
 
 The token needs the smallest account-scoped permissions that allow Workers KV
 namespace edits for the selected development account. Wrangler also needs

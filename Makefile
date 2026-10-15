@@ -5,6 +5,7 @@ ENV ?= dev
 INFRA_ENVIRONMENTS := dev prod
 TERRAFORM := $(MISE) exec -- terraform
 TERRAGRUNT := $(MISE) exec -- terragrunt
+TRIVY := $(MISE) exec -- trivy
 
 .PHONY: help
 help: ## Show available targets
@@ -18,12 +19,15 @@ install: ## Install application dependencies from the lockfile
 dev: ## Start the Worker locally
 	$(MISE) run dev
 
-.PHONY: architecture format lint typecheck test worker-infra-test pre-commit check
+.PHONY: architecture format format-check lint typecheck test worker-infra-test security pre-commit check
 architecture: ## Check application architecture boundaries
 	$(MISE) run architecture
 
 format: ## Format application files
 	$(MISE) run format
+
+format-check: ## Check application formatting without changing files
+	$(MISE) exec -- pnpm --dir app run format-check
 
 lint: ## Lint application files
 	$(MISE) run lint
@@ -38,16 +42,23 @@ worker-infra-test: ## Test Terraform output binding with the local Worker and KV
 	$(MISE) exec -- node --test infra/scripts/tests/configure-dev-worker.test.mjs
 	$(MISE) exec -- node infra/scripts/test-dev-worker-binding.mjs
 
+security: ## Scan dependencies, secrets, and infrastructure for actionable findings
+	$(TRIVY) filesystem --disable-telemetry --no-progress --scanners vuln --include-dev-deps --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 app/pnpm-lock.yaml
+	$(TRIVY) filesystem --disable-telemetry --no-progress --scanners secret --skip-files .env --exit-code 1 .
+	$(TRIVY) filesystem --disable-telemetry --no-progress --scanners misconfig --severity HIGH,CRITICAL --exit-code 1 infra
+
 pre-commit: ## Run fast checks before creating a commit
 	$(MAKE) lint
 
 check: ## Run application and infrastructure checks
 	$(MAKE) architecture
+	$(MAKE) format-check
 	$(MAKE) lint
 	$(MAKE) typecheck
 	$(MAKE) test
 	$(MAKE) worker-infra-test
 	$(MAKE) infra-check
+	$(MAKE) security
 
 .PHONY: check-infra-env check-mutable-infra-env
 check-infra-env:

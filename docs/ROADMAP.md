@@ -5,9 +5,10 @@ the order, scope, and observable outcome of each phase. The
 [README](../README.md) provides only a summary and must not maintain a separate
 phase list.
 
-EdgeFlags has completed **Phases 1 through 3**. Phases 4 and 5 are implemented
-and validated locally; both remain in progress because their remote completion
-criteria require a Cloudflare account that is not currently available.
+EdgeFlags has completed **Phases 1 through 6**. Remote development provisioning,
+deployment, functional KV validation, destruction, and recreation have been
+demonstrated, and the production configuration has produced a reviewed remote
+plan without being applied.
 
 ## Planning model
 
@@ -121,11 +122,12 @@ measurements across locations. Remote validation completes in Phases 4 and 15.
 
 ## Phase 4 - Terraform foundation
 
-**Status:** In progress since 2026-10-08.
+**Status:** Completed on 2026-10-15.
 
-The Terraform configuration passes local formatting and validation. Applying,
-exercising, and destroying the remote development resources are blocked until a
-suitable Cloudflare account and credentials are available.
+The documented Terraform workflow created the development namespace in
+Cloudflare, supplied its binding to the deployed Worker, and supported the full
+flag lifecycle against remote KV. The resources were then destroyed and
+recreated without undocumented console steps.
 
 ### Objective
 
@@ -157,12 +159,12 @@ Terragrunt composition, production infrastructure, and automated deployment.
 
 ## Phase 5 - Terragrunt and environments
 
-**Status:** In progress since 2026-10-09.
+**Status:** Completed on 2026-10-15.
 
 Terragrunt composition, separate environment inputs, local state isolation, and
-validation for both environments are implemented. Account-backed `dev`
-recreation and a reviewable `prod` plan remain blocked by the same missing
-Cloudflare access as Phase 4.
+validation for both environments are implemented. Account-backed development
+recreation succeeded, and the production configuration produced a reviewed plan
+for the expected isolated namespace without applying production changes.
 
 ### Objective
 
@@ -194,15 +196,15 @@ flag behavior inside the application.
 
 ## Phase 6 - Continuous integration
 
-**Status:** In progress since 2026-10-09.
+**Status:** Completed on 2026-10-14.
 
-The initial pull request workflow runs application checks and credential-free
-infrastructure validation in separate least-privilege jobs. Mocked Terraform
-apply/plan runs cover the development and production variants, and a local
-integration test verifies the generated Worker binding against Miniflare KV.
-Remote plans remain blocked until shared state and appropriately scoped
-Cloudflare credentials exist; security scanning also remains to be selected
-based on useful provider coverage.
+The pull request workflow runs application, credential-free infrastructure, and
+security checks in separate least-privilege jobs. Mocked Terraform apply/plan
+runs cover the development and production variants, and a local integration test
+verifies the generated Worker binding against Miniflare KV. Pinned Trivy scans
+dependencies, secrets, and Terraform configuration with an actionable failure
+policy. Remote plans remain deferred until shared state and appropriately scoped
+Cloudflare credentials exist.
 
 ### Objective
 
@@ -220,8 +222,9 @@ developer can run locally.
 ### Completion criteria
 
 A pull request into `develop` reports formatting, linting, type-checking, tests,
-and applicable infrastructure validation without requiring undocumented manual
-steps. Infrastructure plans are reviewable and do not expose secrets.
+security scanning, and applicable credential-free infrastructure validation
+without requiring undocumented manual steps or repository secrets. Remote plans
+will be added only when shared state makes their output accurate and reviewable.
 
 ### Dependencies
 
