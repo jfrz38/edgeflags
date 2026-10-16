@@ -27,9 +27,9 @@ resource "cloudflare_zero_trust_access_application" "this" {
         decision   = "non_identity"
         precedence = 1
         include = [
-          {
+          for id in sort(tolist(var.service_token_ids)) : {
             service_token = {
-              token_id = var.service_token_id
+              token_id = id
             }
           }
         ]

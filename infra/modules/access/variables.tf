@@ -18,13 +18,15 @@ variable "hostname" {
   }
 }
 
-variable "service_token_id" {
-  description = "Bootstrap-created Access Service Token allowed to call the API."
-  type        = string
+variable "service_token_ids" {
+  description = "Bootstrap-created Access Service Tokens allowed to call the API."
+  type        = set(string)
 
   validation {
-    condition     = can(regex("^[0-9a-f-]{36}$", var.service_token_id))
-    error_message = "The Access Service Token ID must be a UUID."
+    condition = length(var.service_token_ids) > 0 && alltrue([
+      for id in var.service_token_ids : can(regex("^[0-9a-f-]{36}$", id))
+    ])
+    error_message = "At least one Access Service Token ID must be provided and every ID must be a UUID."
   }
 }
 

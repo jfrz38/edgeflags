@@ -59,13 +59,16 @@ run "plans_access_protection_with_mock_provider" {
   command = apply
 
   variables {
-    cloudflare_account_id   = "0123456789abcdef0123456789abcdef"
-    environment             = "dev"
-    flags_kv_title          = "edgeflags-dev-flags"
-    access_enabled          = true
-    access_hostname         = "edgeflags-dev.example.workers.dev"
-    access_service_token_id = "12345678-1234-1234-1234-123456789abc"
-    access_allowed_emails   = ["operator@example.com"]
+    cloudflare_account_id = "0123456789abcdef0123456789abcdef"
+    environment           = "dev"
+    flags_kv_title        = "edgeflags-dev-flags"
+    access_enabled        = true
+    access_hostname       = "edgeflags-dev.example.workers.dev"
+    access_service_token_ids = [
+      "12345678-1234-1234-1234-123456789abc",
+      "87654321-4321-4321-4321-cba987654321"
+    ]
+    access_allowed_emails = ["operator@example.com"]
   }
 
   assert {

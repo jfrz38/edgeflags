@@ -14,6 +14,6 @@ module "access" {
   cloudflare_account_id = var.cloudflare_account_id
   name                  = "EdgeFlags ${var.environment} API"
   hostname              = var.access_hostname
-  service_token_id      = var.access_service_token_id
+  service_token_ids     = var.access_service_token_ids
   allowed_emails        = var.access_allowed_emails
 }

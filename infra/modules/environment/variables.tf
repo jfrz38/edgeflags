@@ -35,10 +35,10 @@ variable "access_hostname" {
   default     = "not-configured.invalid"
 }
 
-variable "access_service_token_id" {
-  description = "Bootstrap-created Access Service Token ID used by smoke tests."
-  type        = string
-  default     = "00000000-0000-0000-0000-000000000000"
+variable "access_service_token_ids" {
+  description = "Bootstrap-created Access Service Token IDs allowed to call the environment API."
+  type        = set(string)
+  default     = ["00000000-0000-0000-0000-000000000000"]
 }
 
 variable "access_allowed_emails" {
