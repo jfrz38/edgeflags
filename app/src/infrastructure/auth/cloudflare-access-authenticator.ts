@@ -7,7 +7,7 @@ import type {
   ClientKind,
 } from "../../application/client-authentication";
 
-type AccessContext = Pick<CloudflareAccessContext, "aud" | "getIdentity">;
+type AccessContext = Pick<CloudflareAccessContext, "getIdentity">;
 
 export class CloudflareAccessAuthenticator {
   private readonly scopesByPrincipal: ReadonlyMap<
@@ -25,7 +25,7 @@ export class CloudflareAccessAuthenticator {
     if (access === undefined) return null;
 
     const identity = await access.getIdentity();
-    const principals = resolvePrincipals(identity, access.aud);
+    const principals = resolvePrincipals(identity);
     for (const principal of principals) {
       const scopes = this.scopesByPrincipal.get(principal.principalId);
       if (scopes !== undefined) return { ...principal, scopes };
@@ -37,9 +37,18 @@ export class CloudflareAccessAuthenticator {
 
 function resolvePrincipals(
   identity: CloudflareAccessIdentity | undefined,
-  audience: string,
 ): Array<{ principalId: string; kind: ClientKind }> {
   const principals: Array<{ principalId: string; kind: ClientKind }> = [];
+  const serviceTokenId = readNonEmptyString(identity?.service_token_id);
+  if (serviceTokenId !== null) {
+    return [
+      {
+        principalId: `service:${serviceTokenId}`,
+        kind: "service",
+      },
+    ];
+  }
+
   const userId = readNonEmptyString(identity?.user_uuid);
   if (userId !== null) {
     principals.push({ principalId: `user:${userId}`, kind: "user" });
@@ -51,19 +60,6 @@ function resolvePrincipals(
   }
 
   if (principals.length > 0) return principals;
-
-  const commonName = readNonEmptyString(identity?.common_name);
-  if (commonName !== null) {
-    principals.push({
-      principalId: `service:${commonName}`,
-      kind: "service",
-    });
-  }
-
-  principals.push({
-    principalId: `audience:${audience}`,
-    kind: "service",
-  });
   return principals;
 }
 
@@ -105,7 +101,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isPrincipalId(value: string): boolean {
-  return /^(user|service|audience):[^\s:][^\s]*$/.test(value);
+  return /^(user|service):[^\s:][^\s]*$/.test(value);
 }
 
 function readNonEmptyString(value: unknown): string | null {

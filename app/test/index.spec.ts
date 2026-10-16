@@ -154,7 +154,7 @@ function fetchWorker(request: Request): Promise<Response> {
       ...env,
       ACCESS_ENFORCEMENT_ENABLED: "true",
       AUTHORIZATION_POLICY: JSON.stringify({
-        "audience:local-development": [
+        "service:local-test-token": [
           "flags:read",
           "flags:write",
           "flags:evaluate",
@@ -164,8 +164,11 @@ function fetchWorker(request: Request): Promise<Response> {
     {
       access: {
         aud: "local-development",
-        getIdentity: async () => undefined,
+        getIdentity: async () => ({
+          service_token_id: "local-test-token",
+          service_token_status: true,
+        }),
       },
-    } as ExecutionContext,
+    } as unknown as ExecutionContext,
   );
 }

@@ -1,2 +1,2 @@
 ACCESS_ENFORCEMENT_ENABLED="true"
-AUTHORIZATION_POLICY='{"audience:local-development":["flags:read","flags:write","flags:evaluate"]}'
+AUTHORIZATION_POLICY='{"service:local-development-client":["flags:read","flags:write","flags:evaluate"]}'

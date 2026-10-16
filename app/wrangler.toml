@@ -8,3 +8,7 @@ remote = false
 
 [access.dev]
 aud = "local-development"
+
+[access.dev.identity]
+service_token_id = "local-development-client"
+service_token_status = true

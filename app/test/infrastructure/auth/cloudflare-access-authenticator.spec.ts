@@ -18,52 +18,52 @@ describe("CloudflareAccessAuthenticator", () => {
     });
   });
 
-  it("maps a service token common name to configured scopes", async () => {
+  it("maps a service token ID to configured scopes", async () => {
     const authenticator = new CloudflareAccessAuthenticator(
       JSON.stringify({
-        "service:smoke.access": ["flags:read", "flags:evaluate"],
+        "service:token-id": ["flags:read", "flags:evaluate"],
       }),
     );
 
     const client = await authenticator.authenticate(
-      accessContext({ common_name: "smoke.access" }),
+      accessContext({ service_token_id: "token-id" }),
     );
 
     expect(client).toEqual({
-      principalId: "service:smoke.access",
+      principalId: "service:token-id",
       kind: "service",
       scopes: new Set(["flags:read", "flags:evaluate"]),
     });
   });
 
-  it("uses the application audience when Access exposes no identity", async () => {
+  it("prefers a service token ID over user-shaped identity fields", async () => {
     const authenticator = new CloudflareAccessAuthenticator(
-      JSON.stringify({ "audience:test-audience": ["flags:write"] }),
+      JSON.stringify({ "service:token-id": ["flags:evaluate"] }),
+    );
+
+    const client = await authenticator.authenticate(
+      accessContext({
+        service_token_id: "token-id",
+        service_token_status: true,
+        email: "non-identity@example.com",
+      }),
+    );
+
+    expect(client).toEqual({
+      principalId: "service:token-id",
+      kind: "service",
+      scopes: new Set(["flags:evaluate"]),
+    });
+  });
+
+  it("does not treat an Access audience as a client identity", async () => {
+    const authenticator = new CloudflareAccessAuthenticator(
+      JSON.stringify({ "service:known-token": ["flags:evaluate"] }),
     );
 
     const client = await authenticator.authenticate(accessContext(undefined));
 
-    expect(client).toEqual({
-      principalId: "audience:test-audience",
-      kind: "service",
-      scopes: new Set(["flags:write"]),
-    });
-  });
-
-  it("falls back to the audience when a service identity is not mapped", async () => {
-    const authenticator = new CloudflareAccessAuthenticator(
-      JSON.stringify({ "audience:test-audience": ["flags:write"] }),
-    );
-
-    const client = await authenticator.authenticate(
-      accessContext({ common_name: "unmapped.access" }),
-    );
-
-    expect(client).toEqual({
-      principalId: "audience:test-audience",
-      kind: "service",
-      scopes: new Set(["flags:write"]),
-    });
+    expect(client).toBeNull();
   });
 
   it("can authorize a human by verified email before their UUID is recorded", async () => {
@@ -83,7 +83,7 @@ describe("CloudflareAccessAuthenticator", () => {
 
   it("does not grant an audience policy to an unmapped human", async () => {
     const authenticator = new CloudflareAccessAuthenticator(
-      JSON.stringify({ "audience:test-audience": ["flags:write"] }),
+      JSON.stringify({ "service:test-token": ["flags:write"] }),
     );
 
     const client = await authenticator.authenticate(
@@ -110,6 +110,10 @@ describe("CloudflareAccessAuthenticator", () => {
     ["not-json", "valid JSON"],
     ["{}", "at least one principal"],
     [JSON.stringify({ invalid: ["flags:read"] }), "invalid principal"],
+    [
+      JSON.stringify({ "audience:test-audience": ["flags:read"] }),
+      "invalid principal",
+    ],
     [JSON.stringify({ "user:test": [] }), "invalid scopes"],
     [JSON.stringify({ "user:test": ["unknown"] }), "invalid scopes"],
     [
