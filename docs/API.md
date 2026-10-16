@@ -1,7 +1,34 @@
 # EdgeFlags API
 
-This document describes the HTTP API implemented by the local EdgeFlags Worker.
-The API is unauthenticated until the API security phase.
+This document describes the HTTP API implemented by EdgeFlags. The root health
+endpoint is public. Flag management and evaluation are protected by Cloudflare
+Access when environment activation is enabled.
+
+## Authentication and authorization
+
+Cloudflare Access authenticates requests before protected Worker code runs.
+Human operators sign in through an identity provider configured in Access.
+Automated clients send an Access Service Token:
+
+```http
+CF-Access-Client-Id: <client-id>
+CF-Access-Client-Secret: <client-secret>
+```
+
+Never log, commit, or place these values in Terraform inputs. Access credentials
+prove identity; EdgeFlags separately requires an operation scope:
+
+| Operation | Required scope |
+| --- | --- |
+| Read a flag definition | `flags:read` |
+| Create, replace, or delete a flag | `flags:write` |
+| Evaluate a flag | `flags:evaluate` |
+
+An authenticated identity missing from the environment authorization policy or
+lacking the required scope receives `403 Forbidden`. A protected route reached
+without an Access identity fails closed with `401 Unauthorized`; remotely,
+Cloudflare Access normally rejects such traffic before it reaches the Worker.
+The root `GET /` health endpoint remains public.
 
 ## Feature flags
 
@@ -33,6 +60,8 @@ existing flag returns `200 OK`. Repeating the same request is idempotent.
 ```bash
 curl --fail-with-body \
   --request PUT \
+  --header "CF-Access-Client-Id: $ACCESS_CLIENT_ID" \
+  --header "CF-Access-Client-Secret: $ACCESS_CLIENT_SECRET" \
   --header "Content-Type: application/json" \
   --data '{"enabled":true}' \
   http://localhost:8787/flags/new-checkout
@@ -48,7 +77,10 @@ The response contains the stored definition. An absent flag returns `404 Not
 Found` rather than being treated as disabled.
 
 ```bash
-curl --fail-with-body http://localhost:8787/flags/new-checkout
+curl --fail-with-body \
+  --header "CF-Access-Client-Id: $ACCESS_CLIENT_ID" \
+  --header "CF-Access-Client-Secret: $ACCESS_CLIENT_SECRET" \
+  http://localhost:8787/flags/new-checkout
 ```
 
 ### Delete a flag
@@ -63,6 +95,8 @@ so clients can safely retry the operation.
 ```bash
 curl --fail-with-body \
   --request DELETE \
+  --header "CF-Access-Client-Id: $ACCESS_CLIENT_ID" \
+  --header "CF-Access-Client-Secret: $ACCESS_CLIENT_SECRET" \
   http://localhost:8787/flags/new-checkout
 ```
 
@@ -86,7 +120,10 @@ An absent flag returns `404 Not Found`, which keeps absence distinct from a
 stored `false` value.
 
 ```bash
-curl --fail-with-body http://localhost:8787/evaluate/new-checkout
+curl --fail-with-body \
+  --header "CF-Access-Client-Id: $ACCESS_CLIENT_ID" \
+  --header "CF-Access-Client-Secret: $ACCESS_CLIENT_SECRET" \
+  http://localhost:8787/evaluate/new-checkout
 ```
 
 ## Errors
@@ -106,6 +143,8 @@ Expected errors use a stable JSON envelope:
 | --- | --- | --- |
 | `400` | `INVALID_FLAG_KEY` | The path contains an invalid flag key. |
 | `400` | `INVALID_REQUEST` | The JSON is malformed or does not match the request schema. |
+| `401` | `UNAUTHENTICATED` | A protected route reached the Worker without an Access identity. |
+| `403` | `FORBIDDEN` | The authenticated identity lacks the required scope. |
 | `404` | `FLAG_NOT_FOUND` | A read or evaluation refers to an absent flag. |
 | `404` | `ROUTE_NOT_FOUND` | The requested path is not part of the API. |
 | `405` | `METHOD_NOT_ALLOWED` | A known path does not support the HTTP method. |

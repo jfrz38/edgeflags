@@ -35,7 +35,12 @@ export function readNamespaceId(environment) {
   ).trim();
 }
 
-export function renderWorkerConfig(baseConfig, namespaceId, environment) {
+export function renderWorkerConfig(
+  baseConfig,
+  namespaceId,
+  environment,
+  accessEnabled = false,
+) {
   validateEnvironment(environment);
 
   if (!/^[0-9a-f]{32}$/.test(namespaceId)) {
@@ -46,6 +51,9 @@ export function renderWorkerConfig(baseConfig, namespaceId, environment) {
 
 [env.${environment}]
 name = "edgeflags-${environment}"
+
+[env.${environment}.vars]
+ACCESS_ENFORCEMENT_ENABLED = "${accessEnabled}"
 
 [[env.${environment}.kv_namespaces]]
 binding = "FLAGS_KV"
@@ -65,6 +73,7 @@ export async function configureWorker(
       `../../app/wrangler.${environment}.toml`,
       import.meta.url,
     ),
+    accessEnabled = process.env.ACCESS_ENABLED === "true",
   } = {},
 ) {
   validateEnvironment(environment);
@@ -75,6 +84,7 @@ export async function configureWorker(
     baseConfig,
     namespaceId,
     environment,
+    accessEnabled,
   );
 
   await write(destination, workerConfig, "utf8");

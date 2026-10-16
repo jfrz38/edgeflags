@@ -59,7 +59,7 @@ can be run or when planning it is itself part of an active phase.
 | Observe stale reads across locations | Phase 15 | How does location affect read-after-write behavior? |
 | Evaluate KV suitability | Phase 15 | Which feature flag use cases require stronger consistency? |
 | Exhaust configured rate limits | Phase 9 or 14 | Is `429` behavior predictable and observable? |
-| Rotate an API key | Phase 8 | Can credentials rotate without interrupting valid clients? |
+| [Validate Cloudflare Access and rotate a Service Token](experiments/0002-cloudflare-access-validation.md) | Phase 8 | Can delegated authentication and credential rotation protect development without interrupting deployment? |
 | Inject 500 ms of latency | Phase 14 | Does the latency SLI reflect controlled degradation? |
 | Inject evaluation failures | Phase 14 | Does the availability SLI reflect controlled failures? |
 | Generate a traffic spike with k6 | Phase 14 | How does the service and telemetry react to a spike? |

@@ -42,3 +42,4 @@ The ADR history should remain in the repository even when a decision changes so 
 - [ADR 0002: Manage Cloudflare infrastructure with Terraform](0002-manage-cloudflare-infrastructure-with-terraform.md) - Accepted
 - [ADR 0003: Compose environments with Terragrunt](0003-compose-environments-with-terragrunt.md) - Accepted
 - [ADR 0004: Store Terraform state in Cloudflare R2](0004-store-terraform-state-in-cloudflare-r2.md) - Accepted
+- [ADR 0005: Delegate authentication to Cloudflare Access](0005-delegate-authentication-to-cloudflare-access.md) - Accepted

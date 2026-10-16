@@ -13,6 +13,7 @@ run "applies_development_environment_with_mock_provider" {
 
   variables {
     cloudflare_account_id = "0123456789abcdef0123456789abcdef"
+    environment           = "dev"
     flags_kv_title        = "edgeflags-dev-flags"
   }
 
@@ -32,6 +33,7 @@ run "plans_production_environment" {
 
   variables {
     cloudflare_account_id = "0123456789abcdef0123456789abcdef"
+    environment           = "prod"
     flags_kv_title        = "edgeflags-prod-flags"
   }
 
@@ -46,8 +48,36 @@ run "rejects_invalid_account_id" {
 
   variables {
     cloudflare_account_id = "invalid-account-id"
+    environment           = "dev"
     flags_kv_title        = "edgeflags-dev-flags"
   }
 
   expect_failures = [var.cloudflare_account_id]
+}
+
+run "plans_access_protection_with_mock_provider" {
+  command = apply
+
+  variables {
+    cloudflare_account_id   = "0123456789abcdef0123456789abcdef"
+    environment             = "dev"
+    flags_kv_title          = "edgeflags-dev-flags"
+    access_enabled          = true
+    access_hostname         = "edgeflags-dev.example.workers.dev"
+    access_service_token_id = "12345678-1234-1234-1234-123456789abc"
+    access_allowed_emails   = ["operator@example.com"]
+  }
+
+  assert {
+    condition     = output.access_application_id != null
+    error_message = "Enabling Access must add an environment Access application."
+  }
+
+  assert {
+    condition = tolist(output.access_protected_paths) == tolist([
+      "edgeflags-dev.example.workers.dev/flags/*",
+      "edgeflags-dev.example.workers.dev/evaluate/*"
+    ])
+    error_message = "Access must protect management and evaluation without covering the public health root."
+  }
 }

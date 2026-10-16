@@ -5,10 +5,10 @@ the order, scope, and observable outcome of each phase. The
 [README](../README.md) provides only a summary and must not maintain a separate
 phase list.
 
-EdgeFlags has completed **Phases 1 through 6**. Remote development provisioning,
-deployment, functional KV validation, destruction, and recreation have been
-demonstrated, and the production configuration has produced a reviewed remote
-plan without being applied.
+EdgeFlags has completed **Phases 1 through 6**. Phase 7's development delivery
+path is operational: merges to `develop` back up remote state, apply the reviewed
+plan, deploy the Worker, and pass a remote smoke test. Production delivery
+remains pending until Phase 8 protects the API.
 
 ## Planning model
 
@@ -239,11 +239,11 @@ against a newly deployed release.
 
 **Status:** In progress since 2026-10-15.
 
-Development CD, protected remote plans, R2 state, smoke tests, and recovery
-controls are implemented behind explicit activation variables. R2 bootstrap,
-state migration, lock/recovery validation, and GitHub environment configuration
-must be completed before enabling them. Production deployment remains blocked
-until Phase 8 protects the public mutation API.
+Development CD, environment-scoped remote plans, R2 state backups, exact-plan
+apply, Worker deployment, and smoke tests are active and have completed
+successfully. Production deployment remains blocked until Phase 8 protects the
+public API. Remaining state recovery exercises are operational hardening rather
+than a blocker for API security.
 
 ### Objective
 
@@ -276,6 +276,8 @@ orchestration.
 
 ## Phase 8 - API security
 
+**Status:** In progress since 2026-10-16.
+
 ### Objective
 
 Authenticate API clients and authorize operations without storing reusable
@@ -283,23 +285,25 @@ credentials in plaintext.
 
 ### Deliverables
 
-- API key issuance and request authentication.
-- Credential hashing or another justified non-plaintext verification design.
+- Cloudflare Access authentication for human and automated clients.
+- Service Token bootstrap without storing its Client Secret in Terraform state.
 - Stable client identity and scope definitions.
 - Authorization rules for management and evaluation operations.
-- Secret storage and deployment integration.
-- Key rotation and revocation procedures.
+- Environment-scoped authorization policy and deployment integration.
+- Service Token rotation and revocation procedures.
 - Security-focused unit and integration tests.
 
 ### Completion criteria
 
-Protected operations reject missing, invalid, revoked, and insufficiently scoped
-credentials. Valid keys can be rotated without interrupting clients that have
-already adopted the replacement key.
+Access rejects unauthenticated protected operations before they reach the Worker,
+and EdgeFlags rejects authenticated identities with insufficient scopes. A
+Service Token can be rotated without interrupting a client that has adopted the
+replacement secret, and the old secret can then be revoked.
 
 ### Dependencies
 
-Phases 2, 3, and 7.
+Phases 2, 3, and the operational development-delivery foundation from Phase 7.
+The production portion of Phase 7 follows this phase.
 
 ### Explicitly out of scope
 

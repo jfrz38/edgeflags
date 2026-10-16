@@ -21,8 +21,18 @@ test("renders an environment binding without changing the base configuration", (
 
   assert.match(config, /^name = "edgeflags"/);
   assert.match(config, /\[env\.dev\]\nname = "edgeflags-dev"/);
+  assert.match(
+    config,
+    /\[env\.dev\.vars\]\nACCESS_ENFORCEMENT_ENABLED = "false"/,
+  );
   assert.match(config, new RegExp(`id = "${namespaceId}"`));
   assert.match(config, /\[\[env\.dev\.kv_namespaces\]\][\s\S]*remote = false/);
+});
+
+test("enables Access enforcement only when explicitly requested", () => {
+  const config = renderWorkerConfig(baseConfig, namespaceId, "dev", true);
+
+  assert.match(config, /ACCESS_ENFORCEMENT_ENABLED = "true"/);
 });
 
 test("renders the production environment independently", () => {

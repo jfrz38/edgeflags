@@ -24,6 +24,11 @@ versions. Their committed differences are limited to environment inputs:
 | `dev` | `edgeflags-dev-flags` | Yes, with an explicit command |
 | `prod` | `edgeflags-prod-flags` | No; validation and plan only |
 
+Each environment can also compose a Cloudflare Access application for the
+Worker's `/flags/*` and `/evaluate/*` paths. Access remains disabled unless
+`ACCESS_ENABLED=true` and its hostname and bootstrap-created Service Token ID
+are supplied.
+
 The Cloudflare account is selected at runtime with
 `TF_VAR_cloudflare_account_id`. The API token is supplied with
 `CLOUDFLARE_API_TOKEN`. Neither value belongs in committed Terragrunt files.
@@ -48,11 +53,17 @@ creates each bucket reproducibly with Wrangler. Creating R2 S3 credentials is a
 separate Cloudflare account operation. Merging the configuration does not create
 a bucket, credential, state object, or GitHub environment.
 
+Access Service Tokens are also bootstrap credentials. They are intentionally not
+Terraform resources because Cloudflare returns the Client Secret only once and
+the provider would persist it in Terraform state. Terraform owns the Access
+application and policies that reference the non-secret token ID; GitHub
+environment secrets hold the credentials used by smoke tests.
+
 Before migration, `make infra-state-backup-local` copies development's ignored
 local state into an ignored timestamped backup. `make infra-state-migrate` uses
-Terraform's supported backend migration. Automated plans remain disabled until
-a clean checkout sees the existing namespace without planning a replacement and
-a concurrency test confirms R2 lock behavior.
+Terraform's supported backend migration. Development state has been migrated;
+clean GitHub runners now plan and deploy against R2. Lock and recovery exercises
+remain documented hardening follow-up.
 
 R2 does not provide the state-version history assumed by some S3 workflows.
 `make infra-state-backup` therefore uploads the current development state to a
@@ -95,16 +106,18 @@ Cloudflare account from repository commit `8bc74b2`:
 
 This demonstrates remote wiring and reproducibility for the earlier manual
 workflow. Deployment identifiers, account identifiers, credentials, and the
-ephemeral test key are not committed. The experiment predates the R2 migration,
-which remains to be executed. No cross-location consistency claim follows from
-this validation. See [EXP-0001](experiments/0001-cloudflare-remote-validation.md)
+ephemeral test key are not committed. The experiment predates the later R2
+migration and automated deployment validation. No cross-location consistency
+claim follows from this validation. See [EXP-0001](experiments/0001-cloudflare-remote-validation.md)
 for the recorded procedure and limitations.
 
 ## Free-tier inventory
 
 The default desired remote inventory is two Workers KV namespaces, one for each
-environment, plus one Worker deployment per environment when delivery is
-implemented. Creating a namespace does not reserve a separate usage allowance:
+environment, plus one Worker deployment per environment. When activated, each
+environment also has one Access application and a bounded set of policies;
+Service Tokens are account bootstrap credentials rather than Terraform-managed
+resources. Creating a namespace does not reserve a separate usage allowance:
 Workers and KV limits are aggregated at the Cloudflare account plan level.
 
 Cloudflare's published Workers Free limits checked on 2026-10-09 include:
@@ -132,13 +145,18 @@ backup retention must still be configured and usage observed. The free tier does
 not apply to R2 Infrequent Access storage, so state buckets use Standard storage.
 Source: [R2 pricing](https://developers.cloudflare.com/r2/pricing/).
 
+Cloudflare Access Free limits checked on 2026-10-16 support up to 50 users, and
+the current account limits document lists up to 50 Service Tokens. EdgeFlags
+uses one development smoke-test token and a small explicit operator set. Recheck
+these limits before production activation.
+
 The committed configuration provisions only two empty namespaces, so its static
 inventory does not itself exceed the listed storage or operation allowances.
 Actual traffic from both environments shares the Workers and KV allowances. The
 development apply and production plan were reviewed against the target account
-on 2026-10-15 and fit the listed allowances. R2 state has not yet been
-bootstrapped or measured. Recheck current pricing and account consumption before
-every first environment apply.
+on 2026-10-15 and fit the listed allowances. Development R2 state and backups are
+active; retention and measured usage remain follow-up. Recheck current pricing
+and account consumption before every first environment apply.
 
 ## Commands
 
@@ -165,6 +183,10 @@ make infra-state-migrate ENV=dev
 make infra-state-backup ENV=dev
 make infra-apply ENV=dev
 make infra-destroy ENV=dev
+
+# Development Access bootstrap; run only from a trusted terminal
+make access-token-create ENV=dev
+make access-token-rotate ENV=dev
 ```
 
 Saved plans, pre-migration local state, local backups, generated backends,

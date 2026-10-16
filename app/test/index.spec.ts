@@ -1,9 +1,10 @@
-import { env, exports } from "cloudflare:workers";
+import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import worker from "../src/index";
 
 describe("EdgeFlags Worker", () => {
   it("identifies the service from the root endpoint", async () => {
-    const response = await exports.default.fetch("https://edgeflags.test/");
+    const response = await fetchWorker(new Request("https://edgeflags.test/"));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/json");
@@ -84,7 +85,7 @@ describe("EdgeFlags Worker", () => {
   });
 
   it("requires JSON for PUT requests", async () => {
-    const response = await exports.default.fetch(
+    const response = await fetchWorker(
       new Request("https://edgeflags.test/flags/content-type-check", {
         method: "PUT",
         body: "enabled=true",
@@ -116,7 +117,7 @@ describe("EdgeFlags Worker", () => {
     [JSON.stringify({ enabled: "true" }), "a non-boolean value"],
     [JSON.stringify({ enabled: true, extra: true }), "an unknown property"],
   ])("rejects %s as an invalid request", async (body) => {
-    const response = await exports.default.fetch(
+    const response = await fetchWorker(
       new Request("https://edgeflags.test/flags/invalid-body-check", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -136,12 +137,35 @@ function request(
   path: string,
   body?: unknown,
 ): Promise<Response> {
-  return exports.default.fetch(
+  return fetchWorker(
     new Request(`https://edgeflags.test${path}`, {
       method,
       headers:
         body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
+  );
+}
+
+function fetchWorker(request: Request): Promise<Response> {
+  return worker.fetch(
+    request as Parameters<typeof worker.fetch>[0],
+    {
+      ...env,
+      ACCESS_ENFORCEMENT_ENABLED: "true",
+      AUTHORIZATION_POLICY: JSON.stringify({
+        "audience:local-development": [
+          "flags:read",
+          "flags:write",
+          "flags:evaluate",
+        ],
+      }),
+    },
+    {
+      access: {
+        aud: "local-development",
+        getIdentity: async () => undefined,
+      },
+    } as ExecutionContext,
   );
 }

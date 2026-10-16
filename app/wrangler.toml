@@ -5,3 +5,6 @@ compatibility_date = "2026-09-30"
 [[kv_namespaces]]
 binding = "FLAGS_KV"
 remote = false
+
+[access.dev]
+aud = "local-development"

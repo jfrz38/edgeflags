@@ -11,11 +11,12 @@ observability, and site reliability engineering.
 
 ## Current status
 
-Phases 1 through 6 are complete and Phase 7 is in progress. The repository
+Phases 1 through 6 are complete, development delivery from Phase 7 is
+operational, and Phase 8 API security is in progress. The repository
 contains a reproducible development toolchain, a local and remotely validated
 KV-backed Worker, Terragrunt composition for distinct `dev` and `prod`
-infrastructure, credential-free pull request validation, and dormant development
-CD ready for R2 state migration and GitHub environment activation.
+infrastructure, credential-free pull request validation, environment-scoped
+remote plans, and automatic development deployment with remote smoke tests.
 
 The remaining infrastructure and broader architecture described in the
 documentation are target outcomes. They will become available incrementally as
@@ -154,6 +155,8 @@ make security
 make infra-check
 make infra-plan ENV=dev
 make infra-plan ENV=prod
+make access-token-create ENV=dev
+make access-token-rotate ENV=dev
 make pre-commit
 make check
 ```

@@ -18,7 +18,7 @@ function createScriptedFetch(script) {
       const url = new URL(input);
       const method = init.method ?? "GET";
       const request = `${method} ${url.pathname}`;
-      requests.push(request);
+      requests.push({ request, headers: new Headers(init.headers) });
 
       assert.ok(expected, `Unexpected request: ${request}`);
       assert.equal(request, `${expected.method} ${expected.path}`);
@@ -67,13 +67,16 @@ test("checks health and a disposable flag lifecycle", async () => {
     sleep: async () => {},
   });
 
-  assert.deepEqual(scriptedFetch.requests, [
-    "GET /",
-    "PUT /flags/smoke-check",
-    "GET /flags/smoke-check",
-    "GET /evaluate/smoke-check",
-    "DELETE /flags/smoke-check",
-  ]);
+  assert.deepEqual(
+    scriptedFetch.requests.map(({ request }) => request),
+    [
+      "GET /",
+      "PUT /flags/smoke-check",
+      "GET /flags/smoke-check",
+      "GET /evaluate/smoke-check",
+      "DELETE /flags/smoke-check",
+    ],
+  );
   scriptedFetch.assertComplete();
 });
 
@@ -255,5 +258,59 @@ test("rejects non-HTTPS endpoints before making a request", async () => {
   await assert.rejects(
     smokeWorker({ baseUrl: "http://dev.example.test", fetch }),
     /must use HTTPS/,
+  );
+});
+
+test("authenticates every request with a Cloudflare Access service token", async () => {
+  const scriptedFetch = createScriptedFetch([
+    {
+      method: "GET",
+      path: "/",
+      response: jsonResponse({ service: "edgeflags", status: "ok" }),
+    },
+    {
+      method: "PUT",
+      path: "/flags/smoke-access",
+      response: jsonResponse({}, 201),
+    },
+    {
+      method: "GET",
+      path: "/flags/smoke-access",
+      response: jsonResponse({ key: "smoke-access", enabled: true }),
+    },
+    {
+      method: "GET",
+      path: "/evaluate/smoke-access",
+      response: jsonResponse({ key: "smoke-access", value: true }),
+    },
+    {
+      method: "DELETE",
+      path: "/flags/smoke-access",
+      response: new Response(null, { status: 204 }),
+    },
+  ]);
+
+  await smokeWorker({
+    baseUrl: "https://dev.example.test",
+    key: "smoke-access",
+    accessClientId: "client-id",
+    accessClientSecret: "client-secret",
+    fetch: scriptedFetch.fetch,
+    sleep: async () => {},
+  });
+
+  for (const { headers } of scriptedFetch.requests) {
+    assert.equal(headers.get("CF-Access-Client-Id"), "client-id");
+    assert.equal(headers.get("CF-Access-Client-Secret"), "client-secret");
+  }
+});
+
+test("rejects an incomplete Access service token", async () => {
+  await assert.rejects(
+    smokeWorker({
+      baseUrl: "https://dev.example.test",
+      accessClientId: "client-id",
+    }),
+    /Both Access client ID and client secret are required/,
   );
 });

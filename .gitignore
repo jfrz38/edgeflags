@@ -7,6 +7,7 @@ app/worker-configuration.d.ts
 app/wrangler.dev.toml
 app/wrangler.prod.toml
 app/.wrangler.binding-test.toml
+app/.dev.vars
 
 infra/**/.terraform/
 infra/**/.terragrunt-cache/
