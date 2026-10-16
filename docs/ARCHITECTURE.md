@@ -237,7 +237,9 @@ and `flags:evaluate`. The environment authorization policy is a Worker secret.
 Missing identity, malformed policy, unknown principals, and insufficient scopes
 fail closed. Access Service Tokens provide automation credentials and are
 created outside Terraform so their one-time Client Secrets do not enter remote
-state.
+state. Each automated consumer uses a distinct token and is authorized through
+the stable Service Token Client ID exposed by Access; an application audience is
+never treated as a client identity.
 
 ```text
 Client -> Cloudflare Access -> Access identity -> scope policy
@@ -248,6 +250,11 @@ Authentication does not imply ownership. All authorized clients in an
 environment operate on its shared flags. Multi-tenancy and per-user KV
 namespaces remain non-goals. Rate limits by client or IP and security audit
 events belong to later phases.
+
+The protected API is initially server-to-server. Service Token secrets must not
+be embedded in browser, mobile, or other publicly distributed clients; those
+clients must call through a trusted backend unless a separate public evaluation
+contract is designed later.
 
 Secrets must not be committed to the repository. They must also be kept out of
 Terraform state where practical.

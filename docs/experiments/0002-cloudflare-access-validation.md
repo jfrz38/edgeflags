@@ -28,10 +28,10 @@ tier.
    application paths and policies.
 2. Confirm an unauthenticated request to `/flags/test` is rejected by Access.
 3. Confirm `GET /` remains public.
-4. Configure only `service:<common_name>` for the Service Token and call the
-   protected API. If it is not selected, configure only the documented audience
-   fallback. Record which principal form succeeds without recording credentials
-   or personal data.
+4. Configure `service:<access-client-id>` for the Service Token and call the
+   protected API. Confirm that `ctx.access` exposes the Client ID through
+   `service_token_id`. Record only whether the expected identity shape succeeds,
+   without recording credentials or personal data.
 5. Exercise each scope and verify that an insufficient scope returns `403`
    without changing KV.
 6. Run the authenticated remote smoke test.
@@ -64,5 +64,6 @@ Pending.
 ## Follow-up
 
 - Record remote run links and sanitized observations.
-- Update ADR 0005 if Service Token identity requires signed JWT validation.
+- Update ADR 0005 if the documented `service_token_id` identity is unavailable
+  or requires signed JWT validation.
 - Enable production Access only after development validation succeeds.

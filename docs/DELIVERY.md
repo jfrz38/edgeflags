@@ -144,8 +144,8 @@ Access infrastructure and Worker enforcement share `ACCESS_ENABLED`. Keep it
 false until the development Service Token, repository variables, authorization
 policy, and smoke-test secrets are configured. Activation requires:
 
-- repository variables `DEV_ACCESS_HOSTNAME`,
-  `DEV_ACCESS_SERVICE_TOKEN_ID`, optional `DEV_ACCESS_ALLOWED_EMAILS`, and
+- repository variables `DEV_ACCESS_HOSTNAME`, comma-separated
+  `DEV_ACCESS_SERVICE_TOKEN_IDS`, optional `DEV_ACCESS_ALLOWED_EMAILS`, and
   `ACCESS_ENABLED=true`;
 - GitHub `dev` secrets `ACCESS_CLIENT_ID`, `ACCESS_CLIENT_SECRET`, and
   `AUTHORIZATION_POLICY`.
@@ -157,10 +157,10 @@ bootstrap from a trusted terminal using an API token with `Access: Service
 Tokens Write`. Once active, the smoke test authenticates every request with that
 Service Token.
 
-Cloudflare assigns the application's audience only at creation. Follow the
-two-stage, CD-paused bootstrap in [DEVELOPMENT.md](DEVELOPMENT.md) to apply the
-application, retrieve that audience, install the policy secret, and only then
-enable the normal deployment workflow.
+Create the initial token, configure its resource ID, Client ID authorization
+principal, smoke-test credentials, and hostname before enabling the normal
+deployment workflow. Additional clients use separate Service Tokens so they can
+be authorized, rotated, and revoked independently.
 
 ## Promotion requirements
 

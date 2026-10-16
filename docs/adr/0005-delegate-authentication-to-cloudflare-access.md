@@ -35,7 +35,8 @@ Worker secret:
 - `flags:evaluate`.
 
 Keep one shared flag namespace per environment. Authentication does not add user
-ownership or multi-tenancy.
+ownership or multi-tenancy. Give each automated consumer a distinct Service
+Token so its scopes, rotation, and revocation remain independent.
 
 Manage Access applications and policies with Terraform. Create and rotate
 Service Tokens through an explicit bootstrap command outside Terraform, then
@@ -82,9 +83,9 @@ Terraform state. A controlled bootstrap preserves the stronger secret boundary.
 - Access and GitHub environments require one-time account bootstrap.
 - The application must fail closed if Access identity or authorization policy is
   missing while enforcement is active.
-- Multiple Service Tokens may require a validated provider-specific identity
-  field; until remote validation confirms it, the Access audience is the
-  documented fallback identity for service authentication.
+- Authorization depends on Cloudflare's provider-specific `service_token_id`
+  identity field. The Access audience identifies the protected application, not
+  an individual client, and is never accepted as an authorization principal.
 
 ## Validation
 

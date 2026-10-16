@@ -254,17 +254,19 @@ This permission is not required by normal Worker traffic and should not be added
 to the smoke-test Service Token.
 
 Store the returned Client ID and Client Secret immediately in the GitHub `dev`
-environment. Store the token ID as `DEV_ACCESS_SERVICE_TOKEN_ID`, the Worker
-hostname as `DEV_ACCESS_HOSTNAME`, and the identity-to-scope mapping as the
-`AUTHORIZATION_POLICY` secret. Never place the Client Secret in Terraform inputs
+environment. Add the token resource ID to the comma-separated
+`DEV_ACCESS_SERVICE_TOKEN_IDS` variable, store the Worker hostname as
+`DEV_ACCESS_HOSTNAME`, and store the identity-to-scope mapping as the
+`AUTHORIZATION_POLICY` secret. Never place a Client Secret in Terraform inputs
 or state.
 
-For the initial smoke Service Token, use the Access application audience emitted
-by Terraform as its fallback principal:
+Cloudflare exposes the Service Token Client ID in the authenticated
+`service_token_id` identity field. Use that Client ID as the stable application
+principal:
 
 ```json
 {
-  "audience:<access-audience>": [
+  "service:<access-client-id>": [
     "flags:read",
     "flags:write",
     "flags:evaluate"
@@ -272,26 +274,16 @@ by Terraform as its fallback principal:
 }
 ```
 
-Because Cloudflare assigns that audience when it creates the application, use a
-controlled two-stage activation. Temporarily set `DEV_CD_ENABLED=false`, export
-the Access inputs locally with `ACCESS_ENABLED=true`, and run the reviewed
-development plan/apply. Read `access_audience` from Terragrunt output, configure
-the GitHub authorization policy and smoke-test secrets, then set the repository
-`ACCESS_ENABLED=true`, reenable development CD, and dispatch it. Do not merge or
-run development CD between the local apply and repository-variable update;
-otherwise a plan with Access disabled would remove the new application.
-
-```bash
-terragrunt --working-dir infra/live/dev run --tf-path terraform -- \
-  output -raw access_audience
-```
+Configure the GitHub authorization policy, smoke-test secrets, and token ID list
+before setting `ACCESS_ENABLED=true`. Each additional automated consumer gets a
+separate Service Token, an entry in `DEV_ACCESS_SERVICE_TOKEN_IDS`, and its own
+`service:<access-client-id>` authorization entry. The Access audience is never a
+client identity and cannot grant scopes.
 
 Human identities prefer `user:<user_uuid>`; `user:<verified-email>` is available
-for initial bootstrap before the UUID has been recorded. If remote
-validation confirms that `ctx.access` exposes a Service Token `common_name`, prefer
-`service:<common_name>` so multiple automated clients can receive distinct
-policies. Audience fallback is restricted to identities without a human UUID or
-email, so it cannot grant the smoke token's scopes to an unmapped operator.
+for initial bootstrap before the UUID has been recorded. Service identities must
+provide `service_token_id`; other provider fields and the Access audience do not
+grant scopes.
 
 The first enabled deployment confirms Terraform's Access configuration and turns
 on application enforcement. To rotate with a 24-hour overlap, run:
@@ -371,7 +363,7 @@ Configuration must distinguish public identifiers from credentials:
 | Cloudflare account identifier | Account selection | No |
 | Cloudflare API token | Infrastructure and deployment authentication | Yes |
 | KV namespace and Worker binding names | Storage configuration | No |
-| Access Service Token ID and Access hostname | Access resource configuration | No |
+| Access Service Token resource IDs and Access hostname | Access resource configuration | No |
 | Access Client ID and Client Secret | Automated client authentication | Yes |
 | Authorization policy | Internal identity-to-scope mapping | Yes |
 | External telemetry credentials, if enabled | Observability export | Yes |

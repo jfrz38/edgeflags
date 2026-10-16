@@ -26,7 +26,7 @@ versions. Their committed differences are limited to environment inputs:
 
 Each environment can also compose a Cloudflare Access application for the
 Worker's `/flags/*` and `/evaluate/*` paths. Access remains disabled unless
-`ACCESS_ENABLED=true` and its hostname and bootstrap-created Service Token ID
+`ACCESS_ENABLED=true` and its hostname and bootstrap-created Service Token IDs
 are supplied.
 
 The Cloudflare account is selected at runtime with
@@ -56,7 +56,7 @@ a bucket, credential, state object, or GitHub environment.
 Access Service Tokens are also bootstrap credentials. They are intentionally not
 Terraform resources because Cloudflare returns the Client Secret only once and
 the provider would persist it in Terraform state. Terraform owns the Access
-application and policies that reference the non-secret token ID; GitHub
+application and policies that reference the non-secret token resource IDs; GitHub
 environment secrets hold the credentials used by smoke tests.
 
 Before migration, `make infra-state-backup-local` copies development's ignored
@@ -147,8 +147,9 @@ Source: [R2 pricing](https://developers.cloudflare.com/r2/pricing/).
 
 Cloudflare Access Free limits checked on 2026-10-16 support up to 50 users, and
 the current account limits document lists up to 50 Service Tokens. EdgeFlags
-uses one development smoke-test token and a small explicit operator set. Recheck
-these limits before production activation.
+uses separate tokens for automated consumers, initially only the development
+smoke test, and a small explicit operator set. Recheck these limits before
+production activation.
 
 The committed configuration provisions only two empty namespaces, so its static
 inventory does not itself exceed the listed storage or operation allowances.

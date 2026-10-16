@@ -15,6 +15,10 @@ CF-Access-Client-Id: <client-id>
 CF-Access-Client-Secret: <client-secret>
 ```
 
+Each automated consumer should use its own Service Token. These credentials are
+for trusted server-side clients and must not be embedded in browser or mobile
+applications.
+
 Never log, commit, or place these values in Terraform inputs. Access credentials
 prove identity; EdgeFlags separately requires an operation scope:
 
