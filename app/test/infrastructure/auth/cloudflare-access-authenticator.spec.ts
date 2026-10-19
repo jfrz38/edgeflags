@@ -36,6 +36,69 @@ describe("CloudflareAccessAuthenticator", () => {
     });
   });
 
+  it("maps an Access-authenticated service header when identity is unavailable", async () => {
+    const authenticator = new CloudflareAccessAuthenticator(
+      JSON.stringify({ "service:token-client-id": ["flags:evaluate"] }),
+    );
+
+    const client = await authenticator.authenticate(
+      accessContext(undefined),
+      "token-client-id",
+    );
+
+    expect(client).toEqual({
+      principalId: "service:token-client-id",
+      kind: "service",
+      scopes: new Set(["flags:evaluate"]),
+    });
+  });
+
+  it("does not trust a service header without an Access context", async () => {
+    const authenticator = new CloudflareAccessAuthenticator(
+      JSON.stringify({ "service:token-client-id": ["flags:evaluate"] }),
+    );
+
+    const client = await authenticator.authenticate(
+      undefined,
+      "token-client-id",
+    );
+
+    expect(client).toBeNull();
+  });
+
+  it("prefers a human identity over a supplied service header", async () => {
+    const authenticator = new CloudflareAccessAuthenticator(
+      JSON.stringify({
+        "user:person-id": ["flags:read"],
+        "service:token-client-id": ["flags:write"],
+      }),
+    );
+
+    const client = await authenticator.authenticate(
+      accessContext({ user_uuid: "person-id" }),
+      "token-client-id",
+    );
+
+    expect(client).toEqual({
+      principalId: "user:person-id",
+      kind: "user",
+      scopes: new Set(["flags:read"]),
+    });
+  });
+
+  it("rejects inconsistent service identity sources", async () => {
+    const authenticator = new CloudflareAccessAuthenticator(
+      JSON.stringify({ "service:header-token": ["flags:write"] }),
+    );
+
+    const client = await authenticator.authenticate(
+      accessContext({ service_token_id: "identity-token" }),
+      "header-token",
+    );
+
+    expect(client).toBeNull();
+  });
+
   it("prefers a service token ID over user-shaped identity fields", async () => {
     const authenticator = new CloudflareAccessAuthenticator(
       JSON.stringify({ "service:token-id": ["flags:evaluate"] }),

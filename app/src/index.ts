@@ -25,7 +25,7 @@ export default {
         if (!securityEnabled) return null;
         return new CloudflareAccessAuthenticator(
           env.AUTHORIZATION_POLICY ?? "",
-        ).authenticate(access);
+        ).authenticate(access, request.headers.get("CF-Access-Client-Id"));
       },
       securityEnabled,
     );

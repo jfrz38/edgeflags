@@ -1,6 +1,6 @@
 # EXP-0002: Cloudflare Access validation
 
-- **Status:** Planned
+- **Status:** In progress
 - **Date:** 2026-10-16
 - **Related phase:** Phase 8
 - **Related issues:** None
@@ -29,9 +29,9 @@ tier.
 2. Confirm an unauthenticated request to `/flags/test` is rejected by Access.
 3. Confirm `GET /` remains public.
 4. Configure `service:<access-client-id>` for the Service Token and call the
-   protected API. Confirm that `ctx.access` exposes the Client ID through
-   `service_token_id`. Record only whether the expected identity shape succeeds,
-   without recording credentials or personal data.
+   protected API. Confirm how Service Auth exposes the authenticated client at
+   the Worker boundary. Record only the identity shape, without recording
+   credentials or personal data.
 5. Exercise each scope and verify that an insufficient scope returns `403`
    without changing KV.
 6. Run the authenticated remote smoke test.
@@ -49,7 +49,16 @@ workflow output.
 
 ## Observations
 
-Pending remote activation.
+Development activation on 2026-10-19 confirmed that Access rejects unauthenticated
+protected requests while leaving `GET /` public. Access accepted the configured
+Service Token and recorded it as a `nonidentity` connection, but
+`ctx.access.getIdentity()` did not expose `service_token_id` for that request.
+The initial adapter therefore rejected the authenticated smoke test with `403`.
+
+The application token identified the authenticated Service Token by Client ID,
+and the request retained the `CF-Access-Client-Id` validated by Access. The
+adapter must use that header only after `ctx.access` is present and only when no
+human identity was resolved.
 
 ## Conclusion
 
@@ -64,6 +73,6 @@ Pending.
 ## Follow-up
 
 - Record remote run links and sanitized observations.
-- Update ADR 0005 if the documented `service_token_id` identity is unavailable
-  or requires signed JWT validation.
+- Rerun the authenticated smoke test after adapting the non-identity Service Auth
+  flow.
 - Enable production Access only after development validation succeeds.

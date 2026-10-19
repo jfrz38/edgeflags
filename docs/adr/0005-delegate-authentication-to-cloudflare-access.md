@@ -27,8 +27,11 @@ Keep the root health endpoint public. Human users authenticate through an Access
 identity provider; automation uses an Access Service Token.
 
 Translate `ctx.access` at the infrastructure boundary into an internal immutable
-client identity. Resolve the following scopes from an environment-specific
-Worker secret:
+client identity. Human requests use the identity returned by `getIdentity()`.
+Service Auth is a non-identity Access flow, so automated requests use the
+`CF-Access-Client-Id` that Access has already authenticated; the Worker accepts
+that header only when `ctx.access` is present and no human identity was resolved.
+Resolve the following scopes from an environment-specific Worker secret:
 
 - `flags:read`,
 - `flags:write`, and
@@ -83,9 +86,11 @@ Terraform state. A controlled bootstrap preserves the stronger secret boundary.
 - Access and GitHub environments require one-time account bootstrap.
 - The application must fail closed if Access identity or authorization policy is
   missing while enforcement is active.
-- Authorization depends on Cloudflare's provider-specific `service_token_id`
-  identity field. The Access audience identifies the protected application, not
-  an individual client, and is never accepted as an authorization principal.
+- Authorization depends on Cloudflare's provider-specific Access context and
+  Service Token Client ID header. The Client ID is never trusted without an
+  authenticated Access context. The Access audience identifies the protected
+  application, not an individual client, and is never accepted as an
+  authorization principal.
 
 ## Validation
 

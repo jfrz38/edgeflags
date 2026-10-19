@@ -228,9 +228,11 @@ Expected consistency experiments include:
 
 Cloudflare Access authenticates human operators and automated clients before
 protected requests reach the Worker. Direct Worker invocations expose the
-authenticated identity through `ctx.access`; infrastructure translates that
-provider object into a stable internal client identity. Cloudflare claims do not
-enter application or domain code.
+authenticated Access context through `ctx.access`; infrastructure translates
+human identity from `getIdentity()` and non-identity Service Auth from the
+Access-validated Client ID header into a stable internal client identity. The
+header is never trusted without `ctx.access`, and Cloudflare details do not enter
+application or domain code.
 
 EdgeFlags owns method-level authorization through `flags:read`, `flags:write`,
 and `flags:evaluate`. The environment authorization policy is a Worker secret.

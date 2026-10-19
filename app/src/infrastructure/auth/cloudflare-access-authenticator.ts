@@ -21,11 +21,12 @@ export class CloudflareAccessAuthenticator {
 
   async authenticate(
     access: AccessContext | undefined,
+    serviceTokenClientId?: string | null,
   ): Promise<ClientAuthentication | null> {
     if (access === undefined) return null;
 
     const identity = await access.getIdentity();
-    const principals = resolvePrincipals(identity);
+    const principals = resolvePrincipals(identity, serviceTokenClientId);
     for (const principal of principals) {
       const scopes = this.scopesByPrincipal.get(principal.principalId);
       if (scopes !== undefined) return { ...principal, scopes };
@@ -37,13 +38,22 @@ export class CloudflareAccessAuthenticator {
 
 function resolvePrincipals(
   identity: CloudflareAccessIdentity | undefined,
+  serviceTokenClientId: string | null | undefined,
 ): Array<{ principalId: string; kind: ClientKind }> {
   const principals: Array<{ principalId: string; kind: ClientKind }> = [];
-  const serviceTokenId = readNonEmptyString(identity?.service_token_id);
-  if (serviceTokenId !== null) {
+  const identityServiceTokenId = readNonEmptyString(identity?.service_token_id);
+  const headerServiceTokenId = readNonEmptyString(serviceTokenClientId);
+  if (identityServiceTokenId !== null) {
+    if (
+      headerServiceTokenId !== null &&
+      headerServiceTokenId !== identityServiceTokenId
+    ) {
+      return principals;
+    }
+
     return [
       {
-        principalId: `service:${serviceTokenId}`,
+        principalId: `service:${identityServiceTokenId}`,
         kind: "service",
       },
     ];
@@ -60,6 +70,14 @@ function resolvePrincipals(
   }
 
   if (principals.length > 0) return principals;
+
+  if (headerServiceTokenId !== null) {
+    principals.push({
+      principalId: `service:${headerServiceTokenId}`,
+      kind: "service",
+    });
+  }
+
   return principals;
 }
 

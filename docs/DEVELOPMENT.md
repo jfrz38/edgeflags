@@ -260,9 +260,11 @@ environment. Add the token resource ID to the comma-separated
 `AUTHORIZATION_POLICY` secret. Never place a Client Secret in Terraform inputs
 or state.
 
-Cloudflare exposes the Service Token Client ID in the authenticated
-`service_token_id` identity field. Use that Client ID as the stable application
-principal:
+Cloudflare validates the Service Token Client ID and Client Secret before the
+request reaches the Worker. Service Auth is a non-identity flow in remote
+development, so the Worker uses the validated `CF-Access-Client-Id` header as
+the stable application principal only when `ctx.access` confirms that Access
+authenticated the request:
 
 ```json
 {
@@ -281,9 +283,9 @@ separate Service Token, an entry in `DEV_ACCESS_SERVICE_TOKEN_IDS`, and its own
 client identity and cannot grant scopes.
 
 Human identities prefer `user:<user_uuid>`; `user:<verified-email>` is available
-for initial bootstrap before the UUID has been recorded. Service identities must
-provide `service_token_id`; other provider fields and the Access audience do not
-grant scopes.
+for initial bootstrap before the UUID has been recorded. Human identity takes
+precedence over a supplied Service Token header. Other provider fields and the
+Access audience do not grant scopes.
 
 The first enabled deployment confirms Terraform's Access configuration and turns
 on application enforcement. To rotate with a 24-hour overlap, run:

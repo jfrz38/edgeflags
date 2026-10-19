@@ -148,8 +148,12 @@ function request(
 }
 
 function fetchWorker(request: Request): Promise<Response> {
+  const headers = new Headers(request.headers);
+  headers.set("CF-Access-Client-Id", "local-test-token");
+  const authenticatedRequest = new Request(request, { headers });
+
   return worker.fetch(
-    request as Parameters<typeof worker.fetch>[0],
+    authenticatedRequest as Parameters<typeof worker.fetch>[0],
     {
       ...env,
       ACCESS_ENFORCEMENT_ENABLED: "true",
@@ -164,10 +168,7 @@ function fetchWorker(request: Request): Promise<Response> {
     {
       access: {
         aud: "local-development",
-        getIdentity: async () => ({
-          service_token_id: "local-test-token",
-          service_token_status: true,
-        }),
+        getIdentity: async () => undefined,
       },
     } as unknown as ExecutionContext,
   );
