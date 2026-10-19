@@ -9,48 +9,84 @@ import type {
 
 type AccessContext = Pick<CloudflareAccessContext, "getIdentity">;
 
+type AccessAssertionVerifier = Readonly<{
+  verify(
+    assertion: string | null | undefined,
+    audience: string,
+  ): Promise<string | null>;
+}>;
+
 export class CloudflareAccessAuthenticator {
   private readonly scopesByPrincipal: ReadonlyMap<
     string,
     ReadonlySet<AccessScope>
   >;
+  private readonly assertionVerifier?: AccessAssertionVerifier;
 
-  constructor(serializedPolicy: string) {
+  constructor(
+    serializedPolicy: string,
+    assertionVerifier?: AccessAssertionVerifier,
+  ) {
     this.scopesByPrincipal = parseAuthorizationPolicy(serializedPolicy);
+    this.assertionVerifier = assertionVerifier;
   }
 
   async authenticate(
-    access: AccessContext | undefined,
-    serviceTokenClientId?: string | null,
+    access: (AccessContext & Pick<CloudflareAccessContext, "aud">) | undefined,
+    assertion?: string | null,
   ): Promise<ClientAuthentication | null> {
     if (access === undefined) return null;
 
     const identity = await access.getIdentity();
-    const principals = resolvePrincipals(identity, serviceTokenClientId);
+    const identityPrincipals = resolveIdentityPrincipals(identity);
+    if (identityPrincipals.length > 0) {
+      const identityService = identityPrincipals.find(
+        (principal) => principal.kind === "service",
+      );
+      if (identityService !== undefined && assertion) {
+        const assertedClientId = await this.assertionVerifier?.verify(
+          assertion,
+          access.aud,
+        );
+        if (`service:${assertedClientId}` !== identityService.principalId) {
+          return null;
+        }
+      }
+
+      return this.authorizeFirst(identityPrincipals);
+    }
+
+    const assertedClientId = await this.assertionVerifier?.verify(
+      assertion,
+      access.aud,
+    );
+    return assertedClientId === null || assertedClientId === undefined
+      ? null
+      : this.authorizeFirst([
+          { principalId: `service:${assertedClientId}`, kind: "service" },
+        ]);
+  }
+
+  private authorizeFirst(
+    principals: ReadonlyArray<{
+      principalId: string;
+      kind: ClientKind;
+    }>,
+  ): ClientAuthentication | null {
     for (const principal of principals) {
       const scopes = this.scopesByPrincipal.get(principal.principalId);
       if (scopes !== undefined) return { ...principal, scopes };
     }
-
     return null;
   }
 }
 
-function resolvePrincipals(
+function resolveIdentityPrincipals(
   identity: CloudflareAccessIdentity | undefined,
-  serviceTokenClientId: string | null | undefined,
 ): Array<{ principalId: string; kind: ClientKind }> {
   const principals: Array<{ principalId: string; kind: ClientKind }> = [];
   const identityServiceTokenId = readNonEmptyString(identity?.service_token_id);
-  const headerServiceTokenId = readNonEmptyString(serviceTokenClientId);
   if (identityServiceTokenId !== null) {
-    if (
-      headerServiceTokenId !== null &&
-      headerServiceTokenId !== identityServiceTokenId
-    ) {
-      return principals;
-    }
-
     return [
       {
         principalId: `service:${identityServiceTokenId}`,
@@ -67,15 +103,6 @@ function resolvePrincipals(
   const email = readNonEmptyString(identity?.email);
   if (email !== null) {
     principals.push({ principalId: `user:${email}`, kind: "user" });
-  }
-
-  if (principals.length > 0) return principals;
-
-  if (headerServiceTokenId !== null) {
-    principals.push({
-      principalId: `service:${headerServiceTokenId}`,
-      kind: "service",
-    });
   }
 
   return principals;

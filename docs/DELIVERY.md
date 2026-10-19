@@ -145,8 +145,8 @@ false until the development Service Token, repository variables, authorization
 policy, and smoke-test secrets are configured. Activation requires:
 
 - repository variables `DEV_ACCESS_HOSTNAME`, comma-separated
-  `DEV_ACCESS_SERVICE_TOKEN_IDS`, optional `DEV_ACCESS_ALLOWED_EMAILS`, and
-  `ACCESS_ENABLED=true`;
+  `DEV_ACCESS_SERVICE_TOKEN_IDS`, `DEV_ACCESS_ISSUER`, optional
+  `DEV_ACCESS_ALLOWED_EMAILS`, and `ACCESS_ENABLED=true`;
 - GitHub `dev` secrets `ACCESS_CLIENT_ID`, `ACCESS_CLIENT_SECRET`, and
   `AUTHORIZATION_POLICY`.
 

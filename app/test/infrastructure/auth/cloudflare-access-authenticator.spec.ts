@@ -36,14 +36,15 @@ describe("CloudflareAccessAuthenticator", () => {
     });
   });
 
-  it("maps an Access-authenticated service header when identity is unavailable", async () => {
+  it("maps a verified service assertion when identity is unavailable", async () => {
     const authenticator = new CloudflareAccessAuthenticator(
       JSON.stringify({ "service:token-client-id": ["flags:evaluate"] }),
+      assertionVerifier("token-client-id"),
     );
 
     const client = await authenticator.authenticate(
       accessContext(undefined),
-      "token-client-id",
+      "signed-assertion",
     );
 
     expect(client).toEqual({
@@ -53,30 +54,32 @@ describe("CloudflareAccessAuthenticator", () => {
     });
   });
 
-  it("does not trust a service header without an Access context", async () => {
+  it("does not trust a service assertion without an Access context", async () => {
     const authenticator = new CloudflareAccessAuthenticator(
       JSON.stringify({ "service:token-client-id": ["flags:evaluate"] }),
+      assertionVerifier("token-client-id"),
     );
 
     const client = await authenticator.authenticate(
       undefined,
-      "token-client-id",
+      "signed-assertion",
     );
 
     expect(client).toBeNull();
   });
 
-  it("prefers a human identity over a supplied service header", async () => {
+  it("prefers a human identity over a supplied service assertion", async () => {
     const authenticator = new CloudflareAccessAuthenticator(
       JSON.stringify({
         "user:person-id": ["flags:read"],
         "service:token-client-id": ["flags:write"],
       }),
+      assertionVerifier("token-client-id"),
     );
 
     const client = await authenticator.authenticate(
       accessContext({ user_uuid: "person-id" }),
-      "token-client-id",
+      "signed-assertion",
     );
 
     expect(client).toEqual({
@@ -88,12 +91,13 @@ describe("CloudflareAccessAuthenticator", () => {
 
   it("rejects inconsistent service identity sources", async () => {
     const authenticator = new CloudflareAccessAuthenticator(
-      JSON.stringify({ "service:header-token": ["flags:write"] }),
+      JSON.stringify({ "service:asserted-token": ["flags:write"] }),
+      assertionVerifier("asserted-token"),
     );
 
     const client = await authenticator.authenticate(
       accessContext({ service_token_id: "identity-token" }),
-      "header-token",
+      "signed-assertion",
     );
 
     expect(client).toBeNull();
@@ -194,5 +198,11 @@ function accessContext(
   return {
     aud: "test-audience",
     getIdentity: async () => identity,
+  };
+}
+
+function assertionVerifier(clientId: string | null) {
+  return {
+    verify: async () => clientId,
   };
 }

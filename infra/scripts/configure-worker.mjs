@@ -40,12 +40,17 @@ export function renderWorkerConfig(
   namespaceId,
   environment,
   accessEnabled = false,
+  accessIssuer = "",
 ) {
   validateEnvironment(environment);
 
   if (!/^[0-9a-f]{32}$/.test(namespaceId)) {
     throw new Error("Terragrunt returned an invalid Cloudflare KV namespace ID");
   }
+
+  const normalizedAccessIssuer = accessEnabled
+    ? validateAccessIssuer(accessIssuer)
+    : "";
 
   return `${baseConfig.trimEnd()}
 
@@ -54,6 +59,7 @@ name = "edgeflags-${environment}"
 
 [env.${environment}.vars]
 ACCESS_ENFORCEMENT_ENABLED = "${accessEnabled}"
+${accessEnabled ? `ACCESS_ISSUER = "${normalizedAccessIssuer}"` : ""}
 
 [[env.${environment}.kv_namespaces]]
 binding = "FLAGS_KV"
@@ -74,6 +80,7 @@ export async function configureWorker(
       import.meta.url,
     ),
     accessEnabled = process.env.ACCESS_ENABLED === "true",
+    accessIssuer = process.env.ACCESS_ISSUER ?? "",
   } = {},
 ) {
   validateEnvironment(environment);
@@ -85,9 +92,34 @@ export async function configureWorker(
     namespaceId,
     environment,
     accessEnabled,
+    accessIssuer,
   );
 
   await write(destination, workerConfig, "utf8");
+}
+
+function validateAccessIssuer(value) {
+  let issuer;
+  try {
+    issuer = new URL(value);
+  } catch {
+    throw new Error("ACCESS_ISSUER must be a valid URL");
+  }
+
+  if (
+    issuer.protocol !== "https:" ||
+    issuer.port !== "" ||
+    issuer.username !== "" ||
+    issuer.password !== "" ||
+    !issuer.hostname.endsWith(".cloudflareaccess.com") ||
+    issuer.pathname !== "/" ||
+    issuer.search !== "" ||
+    issuer.hash !== ""
+  ) {
+    throw new Error("ACCESS_ISSUER must be a Cloudflare Access HTTPS origin");
+  }
+
+  return issuer.origin;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -28,10 +28,11 @@ identity provider; automation uses an Access Service Token.
 
 Translate `ctx.access` at the infrastructure boundary into an internal immutable
 client identity. Human requests use the identity returned by `getIdentity()`.
-Service Auth is a non-identity Access flow, so automated requests use the
-`CF-Access-Client-Id` that Access has already authenticated; the Worker accepts
-that header only when `ctx.access` is present and no human identity was resolved.
-Resolve the following scopes from an environment-specific Worker secret:
+Service Auth is a non-identity Access flow, so automated requests use the Client
+ID in a cryptographically verified `Cf-Access-Jwt-Assertion`. The Worker pins
+the issuer, audience, token type, lifetime, and RS256 algorithm before accepting
+its `common_name` claim. Resolve the following scopes from an
+environment-specific Worker secret:
 
 - `flags:read`,
 - `flags:write`, and
@@ -87,9 +88,9 @@ Terraform state. A controlled bootstrap preserves the stronger secret boundary.
 - The application must fail closed if Access identity or authorization policy is
   missing while enforcement is active.
 - Authorization depends on Cloudflare's provider-specific Access context and
-  Service Token Client ID header. The Client ID is never trusted without an
-  authenticated Access context. The Access audience identifies the protected
-  application, not an individual client, and is never accepted as an
+  signed application assertion. Verification requires Cloudflare's JWK endpoint
+  when a cached signing key is unavailable. The Access audience identifies the
+  protected application, not an individual client, and is never accepted as an
   authorization principal.
 
 ## Validation

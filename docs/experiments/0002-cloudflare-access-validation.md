@@ -56,9 +56,10 @@ Service Token and recorded it as a `nonidentity` connection, but
 The initial adapter therefore rejected the authenticated smoke test with `403`.
 
 The application token identified the authenticated Service Token by Client ID,
-and the request retained the `CF-Access-Client-Id` validated by Access. The
-adapter must use that header only after `ctx.access` is present and only when no
-human identity was resolved.
+but the credential Client ID header was not available to the Worker after Access
+processed the request. The adapter must instead verify the
+`Cf-Access-Jwt-Assertion` signature, issuer, audience, lifetime, and algorithm
+before using its `common_name` claim.
 
 ## Conclusion
 

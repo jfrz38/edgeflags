@@ -1,6 +1,18 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "../src/index";
+import { CloudflareAccessAssertionVerifier } from "../src/infrastructure/auth/cloudflare-access-assertion-verifier";
+
+beforeAll(() => {
+  vi.spyOn(
+    CloudflareAccessAssertionVerifier.prototype,
+    "verify",
+  ).mockResolvedValue("local-test-token");
+});
+
+afterAll(() => {
+  vi.restoreAllMocks();
+});
 
 describe("EdgeFlags Worker", () => {
   it("identifies the service from the root endpoint", async () => {
@@ -149,7 +161,7 @@ function request(
 
 function fetchWorker(request: Request): Promise<Response> {
   const headers = new Headers(request.headers);
-  headers.set("CF-Access-Client-Id", "local-test-token");
+  headers.set("Cf-Access-Jwt-Assertion", "signed-access-assertion");
   const authenticatedRequest = new Request(request, { headers });
 
   return worker.fetch(
@@ -157,6 +169,7 @@ function fetchWorker(request: Request): Promise<Response> {
     {
       ...env,
       ACCESS_ENFORCEMENT_ENABLED: "true",
+      ACCESS_ISSUER: "https://edgeflags.cloudflareaccess.com",
       AUTHORIZATION_POLICY: JSON.stringify({
         "service:local-test-token": [
           "flags:read",

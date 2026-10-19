@@ -30,9 +30,52 @@ test("renders an environment binding without changing the base configuration", (
 });
 
 test("enables Access enforcement only when explicitly requested", () => {
-  const config = renderWorkerConfig(baseConfig, namespaceId, "dev", true);
+  const config = renderWorkerConfig(
+    baseConfig,
+    namespaceId,
+    "dev",
+    true,
+    "https://edgeflags.cloudflareaccess.com",
+  );
 
   assert.match(config, /ACCESS_ENFORCEMENT_ENABLED = "true"/);
+  assert.match(
+    config,
+    /ACCESS_ISSUER = "https:\/\/edgeflags\.cloudflareaccess\.com"/,
+  );
+});
+
+test("does not render an Access issuer while enforcement is disabled", () => {
+  const config = renderWorkerConfig(
+    baseConfig,
+    namespaceId,
+    "dev",
+    false,
+    "not-an-issuer",
+  );
+
+  assert.doesNotMatch(config, /ACCESS_ISSUER/);
+});
+
+test("requires a valid Cloudflare Access issuer when enforcement is enabled", () => {
+  for (const invalidIssuer of [
+    "",
+    "http://edgeflags.cloudflareaccess.com",
+    "https://example.com",
+    "https://edgeflags.cloudflareaccess.com/path",
+  ]) {
+    assert.throws(
+      () =>
+        renderWorkerConfig(
+          baseConfig,
+          namespaceId,
+          "dev",
+          true,
+          invalidIssuer,
+        ),
+      /ACCESS_ISSUER/,
+    );
+  }
 });
 
 test("renders the production environment independently", () => {

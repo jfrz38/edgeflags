@@ -2,12 +2,14 @@ import { DeleteFlag } from "./application/delete-flag";
 import { EvaluateFlag } from "./application/evaluate-flag";
 import { GetFlag } from "./application/get-flag";
 import { PutFlag } from "./application/put-flag";
+import { CloudflareAccessAssertionVerifier } from "./infrastructure/auth/cloudflare-access-assertion-verifier";
 import { CloudflareAccessAuthenticator } from "./infrastructure/auth/cloudflare-access-authenticator";
 import { createHttpHandler } from "./infrastructure/http/create-http-handler";
 import { KvFlagRepository } from "./infrastructure/persistence/kv-flag-repository";
 
 type RuntimeEnv = Env & {
   ACCESS_ENFORCEMENT_ENABLED?: string;
+  ACCESS_ISSUER?: string;
   AUTHORIZATION_POLICY?: string;
 };
 
@@ -23,9 +25,13 @@ export default {
       new EvaluateFlag(getFlag),
       async (access) => {
         if (!securityEnabled) return null;
+        const assertion = request.headers.get("Cf-Access-Jwt-Assertion");
         return new CloudflareAccessAuthenticator(
           env.AUTHORIZATION_POLICY ?? "",
-        ).authenticate(access, request.headers.get("CF-Access-Client-Id"));
+          assertion === null
+            ? undefined
+            : new CloudflareAccessAssertionVerifier(env.ACCESS_ISSUER ?? ""),
+        ).authenticate(access, assertion);
       },
       securityEnabled,
     );

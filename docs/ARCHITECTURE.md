@@ -230,9 +230,10 @@ Cloudflare Access authenticates human operators and automated clients before
 protected requests reach the Worker. Direct Worker invocations expose the
 authenticated Access context through `ctx.access`; infrastructure translates
 human identity from `getIdentity()` and non-identity Service Auth from the
-Access-validated Client ID header into a stable internal client identity. The
-header is never trusted without `ctx.access`, and Cloudflare details do not enter
-application or domain code.
+cryptographically verified `Cf-Access-Jwt-Assertion` into a stable internal
+client identity. Verification pins the Access issuer, application audience, and
+RS256 algorithm before accepting the assertion's Service Token Client ID.
+Cloudflare details do not enter application or domain code.
 
 EdgeFlags owns method-level authorization through `flags:read`, `flags:write`,
 and `flags:evaluate`. The environment authorization policy is a Worker secret.

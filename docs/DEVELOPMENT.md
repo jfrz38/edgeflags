@@ -256,15 +256,17 @@ to the smoke-test Service Token.
 Store the returned Client ID and Client Secret immediately in the GitHub `dev`
 environment. Add the token resource ID to the comma-separated
 `DEV_ACCESS_SERVICE_TOKEN_IDS` variable, store the Worker hostname as
-`DEV_ACCESS_HOSTNAME`, and store the identity-to-scope mapping as the
-`AUTHORIZATION_POLICY` secret. Never place a Client Secret in Terraform inputs
-or state.
+`DEV_ACCESS_HOSTNAME`, store the Access organization issuer as
+`DEV_ACCESS_ISSUER`, and store the identity-to-scope mapping as the
+`AUTHORIZATION_POLICY` secret. The issuer is an HTTPS origin such as
+`https://team.cloudflareaccess.com`. Never place a Client Secret in Terraform
+inputs or state.
 
 Cloudflare validates the Service Token Client ID and Client Secret before the
 request reaches the Worker. Service Auth is a non-identity flow in remote
-development, so the Worker uses the validated `CF-Access-Client-Id` header as
-the stable application principal only when `ctx.access` confirms that Access
-authenticated the request:
+development, so the Worker verifies the signed `Cf-Access-Jwt-Assertion`
+against the configured issuer and `ctx.access.aud`, then uses its `common_name`
+Client ID as the stable application principal:
 
 ```json
 {
@@ -284,8 +286,8 @@ client identity and cannot grant scopes.
 
 Human identities prefer `user:<user_uuid>`; `user:<verified-email>` is available
 for initial bootstrap before the UUID has been recorded. Human identity takes
-precedence over a supplied Service Token header. Other provider fields and the
-Access audience do not grant scopes.
+precedence over a supplied assertion. An unverified JWT, other provider fields,
+and the Access audience alone do not grant scopes.
 
 The first enabled deployment confirms Terraform's Access configuration and turns
 on application enforcement. To rotate with a 24-hour overlap, run:
@@ -365,7 +367,7 @@ Configuration must distinguish public identifiers from credentials:
 | Cloudflare account identifier | Account selection | No |
 | Cloudflare API token | Infrastructure and deployment authentication | Yes |
 | KV namespace and Worker binding names | Storage configuration | No |
-| Access Service Token resource IDs and Access hostname | Access resource configuration | No |
+| Access Service Token resource IDs, hostname, and issuer | Access and Worker security configuration | No |
 | Access Client ID and Client Secret | Automated client authentication | Yes |
 | Authorization policy | Internal identity-to-scope mapping | Yes |
 | External telemetry credentials, if enabled | Observability export | Yes |
