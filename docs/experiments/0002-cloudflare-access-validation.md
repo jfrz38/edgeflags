@@ -61,6 +61,16 @@ processed the request. The adapter must instead verify the
 `Cf-Access-Jwt-Assertion` signature, issuer, audience, lifetime, and algorithm
 before using its `common_name` claim.
 
+The adapted Service Auth flow passed an authenticated remote flag lifecycle on
+2026-10-19 and again in the automatic development deployment for commit
+`c21d88f` on 2026-10-24. The latter run is recorded at
+<https://github.com/jfrz38/edgeflags/actions/runs/40053449412>. A direct check on
+2026-10-24 also confirmed that `GET /` returned the public health response with
+`200`, while an unauthenticated request to `/flags/access-validation` returned
+`401` before a Worker JSON response.
+
+Remote insufficient-scope validation and Service Token rotation remain pending.
+
 ## Conclusion
 
 Pending.

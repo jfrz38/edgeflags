@@ -134,6 +134,7 @@ make infra-validate
 make infra-check
 make infra-plan ENV=dev
 make infra-plan ENV=prod
+make access-validate ENV=dev BASE_URL=https://...
 make pre-commit
 make check
 ```
@@ -283,6 +284,44 @@ before setting `ACCESS_ENABLED=true`. Each additional automated consumer gets a
 separate Service Token, an entry in `DEV_ACCESS_SERVICE_TOKEN_IDS`, and its own
 `service:<access-client-id>` authorization entry. The Access audience is never a
 client identity and cannot grant scopes.
+
+To validate authorization remotely without reducing the smoke-test client's
+permissions, create a temporary second Service Token with a distinct name:
+
+```bash
+ACCESS_SERVICE_TOKEN_NAME=edgeflags-dev-read-validation \
+  make access-token-create ENV=dev
+```
+
+Add its resource ID temporarily to the GitHub `dev` environment variable
+`DEV_ACCESS_SERVICE_TOKEN_IDS`. Merge its Client ID into the existing
+`AUTHORIZATION_POLICY` secret with only `flags:read`; do not remove the regular
+smoke-test principal:
+
+```json
+{
+  "service:<smoke-test-access-client-id>": [
+    "flags:read",
+    "flags:write",
+    "flags:evaluate"
+  ],
+  "service:<limited-access-client-id>": ["flags:read"]
+}
+```
+
+After deploying that policy, keep the regular smoke-test credentials in
+`ACCESS_CLIENT_ID` and `ACCESS_CLIENT_SECRET`, export the temporary credentials
+as `LIMITED_ACCESS_CLIENT_ID` and `LIMITED_ACCESS_CLIENT_SECRET`, and run:
+
+```bash
+make access-validate ENV=dev BASE_URL=https://...
+```
+
+The validation confirms that health remains public, an unauthenticated protected
+request receives `401`, the limited client can read, write/evaluate/delete return
+`403`, and denied operations do not change KV. It always attempts cleanup with
+the full-scope client. Afterwards, delete the temporary Service Token, remove its
+resource ID and authorization entry, and redeploy the restored configuration.
 
 Human identities prefer `user:<user_uuid>`; `user:<verified-email>` is available
 for initial bootstrap before the UUID has been recorded. Human identity takes

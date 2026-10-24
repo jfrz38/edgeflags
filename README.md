@@ -157,6 +157,7 @@ make infra-plan ENV=dev
 make infra-plan ENV=prod
 make access-token-create ENV=dev
 make access-token-rotate ENV=dev
+make access-validate ENV=dev BASE_URL=https://...
 make pre-commit
 make check
 ```

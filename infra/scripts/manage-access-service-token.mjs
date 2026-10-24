@@ -8,6 +8,7 @@ export async function manageAccessServiceToken({
   accountId,
   apiToken,
   serviceTokenId,
+  serviceTokenName = `edgeflags-${environment}-smoke`,
   fetch: fetchRequest = globalThis.fetch,
   now = () => Date.now(),
 }) {
@@ -24,8 +25,13 @@ export async function manageAccessServiceToken({
   let body;
 
   if (action === "create") {
+    if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(serviceTokenName)) {
+      throw new Error(
+        "ACCESS_SERVICE_TOKEN_NAME must be a lowercase kebab-case name",
+      );
+    }
     body = {
-      name: `edgeflags-${environment}-smoke`,
+      name: serviceTokenName,
       duration: "8760h",
     };
   } else if (action === "rotate") {
@@ -81,6 +87,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
     apiToken: process.env.CLOUDFLARE_API_TOKEN,
     serviceTokenId: process.env.ACCESS_SERVICE_TOKEN_ID,
+    serviceTokenName: process.env.ACCESS_SERVICE_TOKEN_NAME,
   });
 
   console.log("Store these values immediately; the client secret is shown once:");

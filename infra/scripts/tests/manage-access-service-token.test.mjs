@@ -27,6 +27,42 @@ test("creates a bounded development service token", async () => {
   assert.equal(result.clientSecret, "client-secret");
 });
 
+test("creates a distinctly named authorization validation token", async () => {
+  let request;
+  await manageAccessServiceToken({
+    action: "create",
+    environment: "dev",
+    accountId,
+    apiToken: "api-token",
+    serviceTokenName: "edgeflags-dev-read-validation",
+    fetch: async (url, init) => {
+      request = { url, init };
+      return response();
+    },
+  });
+
+  assert.deepEqual(JSON.parse(request.init.body), {
+    name: "edgeflags-dev-read-validation",
+    duration: "8760h",
+  });
+});
+
+test("rejects an invalid service token name before contacting Cloudflare", async () => {
+  await assert.rejects(
+    manageAccessServiceToken({
+      action: "create",
+      environment: "dev",
+      accountId,
+      apiToken: "api-token",
+      serviceTokenName: "Invalid token name",
+      fetch: async () => {
+        throw new Error("Fetch should not be called");
+      },
+    }),
+    /must be a lowercase kebab-case name/,
+  );
+});
+
 test("rotates with a 24-hour overlap", async () => {
   let request;
   await manageAccessServiceToken({
