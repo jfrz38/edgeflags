@@ -35,3 +35,11 @@ If an ADR supersedes another decision, link both records.
 6. Commit the ADR with the implementation or infrastructure change that makes the decision real.
 
 The ADR history should remain in the repository even when a decision changes so the evolution of the project is understandable later.
+
+## Records
+
+- [ADR 0001: Use versioned Cloudflare KV storage](0001-use-versioned-cloudflare-kv-storage.md) - Accepted
+- [ADR 0002: Manage Cloudflare infrastructure with Terraform](0002-manage-cloudflare-infrastructure-with-terraform.md) - Accepted
+- [ADR 0003: Compose environments with Terragrunt](0003-compose-environments-with-terragrunt.md) - Accepted
+- [ADR 0004: Store Terraform state in Cloudflare R2](0004-store-terraform-state-in-cloudflare-r2.md) - Accepted
+- [ADR 0005: Delegate authentication to Cloudflare Access](0005-delegate-authentication-to-cloudflare-access.md) - Accepted

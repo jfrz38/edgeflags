@@ -1,0 +1,17 @@
+{
+  "enabledLanguages": ["typescript"],
+  "layers": {
+    "domain": {
+      "aliases": ["domain"],
+      "allowedDependencies": ["domain"]
+    },
+    "application": {
+      "aliases": ["application"],
+      "allowedDependencies": ["application", "domain"]
+    },
+    "infrastructure": {
+      "aliases": ["infrastructure"],
+      "allowedDependencies": ["infrastructure", "application", "domain"]
+    }
+  }
+}

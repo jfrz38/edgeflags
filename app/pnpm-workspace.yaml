@@ -1,0 +1,13 @@
+saveExact: true
+
+# Remove these once the direct toolchain dependencies resolve the patched versions.
+overrides:
+  sharp: 0.35.5 # GHSA-wq5f-xc86-pv6w
+  source-map-js: 1.2.2 # CVE-2026-93749
+  undici: 7.30.1 # CVE-2026-109869
+  vite: 8.3.5 # CVE-2026-112942
+  zod: 4.6.7 # CVE-2023-54404
+
+allowBuilds:
+  esbuild: true
+  workerd: true

@@ -1,0 +1,38 @@
+[tools]
+make = "4.4.1"
+node = "24.21.0"
+pnpm = "12.8.1"
+rclone = "1.75.2"
+terraform = "1.16.5"
+terragrunt = "1.1.6"
+trivy = "0.75.0"
+
+[tasks.dev]
+description = "Start the Worker locally"
+dir = "app"
+run = "pnpm run dev"
+
+[tasks.architecture]
+description = "Check application architecture boundaries"
+dir = "app"
+run = "pnpm run architecture"
+
+[tasks.format]
+description = "Format application files"
+dir = "app"
+run = "pnpm run format"
+
+[tasks.lint]
+description = "Lint application files"
+dir = "app"
+run = "pnpm run lint"
+
+[tasks.typecheck]
+description = "Type-check the Worker and tests"
+dir = "app"
+run = "pnpm run typecheck"
+
+[tasks.test]
+description = "Run application tests"
+dir = "app"
+run = "pnpm run test"

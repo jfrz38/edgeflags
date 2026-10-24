@@ -1,0 +1,111 @@
+name: Production Deployment
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate
+    if: vars.PROD_CD_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install pinned toolchain
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          version: 2026.8.14
+
+      - name: Install application dependencies
+        run: make install
+
+      - name: Run required checks
+        run: make check
+
+  deploy:
+    name: Deploy production
+    if: vars.PROD_CD_ENABLED == 'true'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: prod
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.TERRAFORM_STATE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TERRAFORM_STATE_SECRET_ACCESS_KEY }}
+      AWS_EC2_METADATA_DISABLED: "true"
+      ACCESS_ALLOWED_EMAILS: ""
+      ACCESS_ENABLED: "true"
+      ACCESS_HOSTNAME: ${{ vars.PROD_ACCESS_HOSTNAME }}
+      ACCESS_ISSUER: ${{ vars.PROD_ACCESS_ISSUER }}
+      ACCESS_SERVICE_TOKEN_IDS: ${{ vars.PROD_ACCESS_SERVICE_TOKEN_IDS }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+      TF_VAR_cloudflare_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install pinned toolchain
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          version: 2026.8.14
+
+      - name: Install application dependencies
+        run: make install
+
+      - name: Back up production state
+        env:
+          R2_BACKUP_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+          R2_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+        run: make infra-state-backup ENV=prod
+
+      - name: Plan production infrastructure
+        run: make infra-plan ENV=prod
+
+      - name: Summarize exact production plan
+        run: make infra-plan-summary ENV=prod >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply exact production plan
+        run: make infra-apply ENV=prod
+
+      - name: Deploy production Worker
+        env:
+          AUTHORIZATION_POLICY: ${{ secrets.AUTHORIZATION_POLICY }}
+        run: make deploy ENV=prod
+
+      - name: Smoke-test production
+        env:
+          ACCESS_CLIENT_ID: ${{ secrets.ACCESS_CLIENT_ID }}
+          ACCESS_CLIENT_SECRET: ${{ secrets.ACCESS_CLIENT_SECRET }}
+        run: make smoke ENV=prod BASE_URL="${{ vars.PROD_BASE_URL }}"
+
+      - name: Summarize deployment
+        if: always()
+        shell: bash
+        run: |
+          printf '%s\n' \
+            '## Production deployment' \
+            '' \
+            '- Commit: `${{ github.sha }}`' \
+            '- Environment: `prod`' \
+            '- Result: `${{ job.status }}`' \
+            '' \
+            'Production is started manually from main. A failed smoke test marks the deployment as failed; Terraform is never rolled back automatically.' \
+            >> "$GITHUB_STEP_SUMMARY"
