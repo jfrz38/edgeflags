@@ -134,15 +134,20 @@ make infra-validate
 make infra-check
 make infra-plan ENV=dev
 make infra-plan ENV=prod
+make infra-state-backup ENV=prod
+make infra-apply ENV=prod
+make deploy ENV=prod
+make smoke ENV=prod BASE_URL=https://...
 make access-validate ENV=dev BASE_URL=https://...
 make pre-commit
 make check
 ```
 
 Mutable infrastructure and deployment commands are intentionally separate from
-routine checks: `make infra-apply`, `make deploy ENV=dev`, and
-`make infra-destroy`. `infra-apply` consumes the saved plan created by
-`infra-plan`; `infra-destroy` remains interactive. Only run these commands after
+routine checks: `make infra-apply`, `make deploy`, and `make infra-destroy`.
+`infra-apply` consumes the saved plan created for the same `ENV`; production
+apply and deployment fail unless `ACCESS_ENABLED=true`. `infra-destroy` remains
+interactive and restricted to development. Only run these commands after
 reviewing the target account and expected changes.
 
 Make is the public operational interface and delegates to tool versions managed
@@ -207,9 +212,10 @@ make infra-show ENV=prod
 `ENV` defaults to `dev` and only accepts `dev` or `prod`. Remote operations also
 require the R2 backend variables shown above. Plans are written as
 ignored `edgeflags-<environment>.tfplan` files. Changes to code, inputs,
-credentials, or state require a new plan. Applying and destroying infrastructure
-are restricted to `ENV=dev`; production mutation remains blocked until the
-controlled production delivery path is available.
+credentials, or state require a new plan. Production mutation is available only
+through an explicitly protected configuration and is intended for the
+approval-gated workflow. Destroy and local-state migration remain restricted to
+`ENV=dev`.
 
 After reviewing the development plan, apply it explicitly:
 
@@ -377,9 +383,11 @@ deployment configuration generator, loads the generated `dev` configuration in
 Miniflare, and runs the complete HTTP flag lifecycle against local KV. The
 temporary configuration is removed after the test.
 
-The generator also supports `make configure-worker ENV=prod` so its configuration
-contract can be tested, but `make deploy ENV=prod` and `make smoke ENV=prod` are
-rejected before they can contact Cloudflare.
+The generator, deployment, and smoke targets support `ENV=prod`. Production
+requires Access, a saved production plan, an authorization-policy secret, and
+Service Token credentials. Its smoke test first proves an unauthenticated
+protected request returns `401`, so an accidentally public deployment cannot
+pass.
 
 ### Remote validation
 
