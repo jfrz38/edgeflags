@@ -2,8 +2,8 @@
 
 This document defines the branch, environment, and delivery model. Pull request
 CI, environment-scoped remote development plans, R2 state, and automatic
-development deployments are active. Cloudflare Access integration is implemented
-behind coordinated activation while its remote identity behavior is validated.
+development deployments are active. Cloudflare Access and EdgeFlags authorization
+are active and remotely validated in development.
 
 ## Branch model
 
@@ -135,8 +135,8 @@ Worker deploy -> disposable-flag smoke test
 
 Terraform owns each KV namespace. Wrangler owns Worker deployment and reads the
 development namespace ID from Terragrunt output through an ignored generated
-configuration. Production apply and deployment remain unavailable until API
-authentication is remotely validated.
+configuration. Production apply and deployment remain unavailable until the
+controlled production delivery path is implemented.
 
 ## Cloudflare Access activation
 

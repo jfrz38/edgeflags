@@ -86,6 +86,49 @@ test("rotates with a 24-hour overlap", async () => {
   });
 });
 
+test("supports an explicit short overlap for a revocation exercise", async () => {
+  let request;
+  await manageAccessServiceToken({
+    action: "rotate",
+    environment: "dev",
+    accountId,
+    apiToken: "api-token",
+    serviceTokenId,
+    rotationOverlapMilliseconds: 10 * 60 * 1_000,
+    now: () => Date.parse("2026-10-16T00:00:00.000Z"),
+    fetch: async (url, init) => {
+      request = { url, init };
+      return response({
+        previous_client_secret_expires_at: "2026-10-16T00:10:00.000Z",
+      });
+    },
+  });
+
+  assert.deepEqual(JSON.parse(request.init.body), {
+    previous_client_secret_expires_at: "2026-10-16T00:10:00.000Z",
+  });
+});
+
+test("deletes a service token by resource ID", async () => {
+  let request;
+  const result = await manageAccessServiceToken({
+    action: "delete",
+    environment: "dev",
+    accountId,
+    apiToken: "api-token",
+    serviceTokenId,
+    fetch: async (url, init) => {
+      request = { url, init };
+      return response();
+    },
+  });
+
+  assert.match(request.url, new RegExp(`${serviceTokenId}$`));
+  assert.equal(request.init.method, "DELETE");
+  assert.equal(request.init.body, undefined);
+  assert.deepEqual(result, { id: serviceTokenId });
+});
+
 test("hides provider details when Cloudflare rejects the request", async () => {
   await assert.rejects(
     manageAccessServiceToken({

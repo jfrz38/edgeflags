@@ -145,11 +145,14 @@ backup retention must still be configured and usage observed. The free tier does
 not apply to R2 Infrequent Access storage, so state buckets use Standard storage.
 Source: [R2 pricing](https://developers.cloudflare.com/r2/pricing/).
 
-Cloudflare Access Free limits checked on 2026-10-16 support up to 50 users, and
+Cloudflare Access Free limits checked on 2026-10-24 support up to 50 users, and
 the current account limits document lists up to 50 Service Tokens. EdgeFlags
 uses separate tokens for automated consumers, initially only the development
 smoke test, and a small explicit operator set. Recheck these limits before
 production activation.
+
+Sources: [Access pricing](https://www.cloudflare.com/sase/products/access/) and
+[Cloudflare One account limits](https://developers.cloudflare.com/cloudflare-one/account-limits/).
 
 The committed configuration provisions only two empty namespaces, so its static
 inventory does not itself exceed the listed storage or operation allowances.

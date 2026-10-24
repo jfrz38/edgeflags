@@ -208,8 +208,8 @@ make infra-show ENV=prod
 require the R2 backend variables shown above. Plans are written as
 ignored `edgeflags-<environment>.tfplan` files. Changes to code, inputs,
 credentials, or state require a new plan. Applying and destroying infrastructure
-are restricted to `ENV=dev`; production mutation remains blocked until API
-security and controlled production delivery are available.
+are restricted to `ENV=dev`; production mutation remains blocked until the
+controlled production delivery path is available.
 
 After reviewing the development plan, apply it explicitly:
 
@@ -321,7 +321,12 @@ The validation confirms that health remains public, an unauthenticated protected
 request receives `401`, the limited client can read, write/evaluate/delete return
 `403`, and denied operations do not change KV. It always attempts cleanup with
 the full-scope client. Afterwards, delete the temporary Service Token, remove its
-resource ID and authorization entry, and redeploy the restored configuration.
+resource ID and authorization entry, and redeploy the restored configuration:
+
+```bash
+ACCESS_SERVICE_TOKEN_ID=<temporary-resource-id> \
+  make access-token-delete ENV=dev
+```
 
 Human identities prefer `user:<user_uuid>`; `user:<verified-email>` is available
 for initial bootstrap before the UUID has been recorded. Human identity takes
@@ -337,7 +342,10 @@ make access-token-rotate ENV=dev
 
 Update GitHub with the replacement secret before the overlap expires.
 Cloudflare revokes the previous secret at the configured timestamp. For an
-emergency revocation, disable or delete the Service Token under Zero Trust
+explicit validation exercise, `ACCESS_TOKEN_ROTATION_OVERLAP_SECONDS` can shorten
+the overlap to no less than 60 seconds; normal operations use the 24-hour
+default. For an emergency revocation, disable or delete the Service Token under
+Zero Trust
 **Access controls > Service credentials**, then create a replacement before
 reenabling automated deployment.
 

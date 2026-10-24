@@ -122,7 +122,7 @@ infra-apply: check-mutable-infra-env ## Apply the reviewed development plan
 infra-destroy: check-mutable-infra-env ## Destroy development resources after confirmation
 	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- destroy
 
-.PHONY: configure-worker configure-worker-secret deploy smoke access-validate access-token-create access-token-rotate
+.PHONY: configure-worker configure-worker-secret deploy smoke access-validate access-token-create access-token-rotate access-token-delete
 configure-worker: check-infra-env ## Generate ignored Wrangler configuration for ENV
 	$(MISE) exec -- node infra/scripts/configure-worker.mjs "$(ENV)"
 
@@ -152,6 +152,9 @@ access-token-create: check-mutable-infra-env check-cloudflare-account check-clou
 
 access-token-rotate: check-mutable-infra-env check-cloudflare-account check-cloudflare-token ## Rotate the development Access Service Token with a 24-hour overlap
 	$(MISE) exec -- node infra/scripts/manage-access-service-token.mjs rotate "$(ENV)"
+
+access-token-delete: check-mutable-infra-env check-cloudflare-account check-cloudflare-token ## Delete a development Access Service Token by resource ID
+	$(MISE) exec -- node infra/scripts/manage-access-service-token.mjs delete "$(ENV)"
 
 infra-state-bootstrap: check-infra-env check-cloudflare-account check-cloudflare-token ## Create the R2 state bucket for ENV (one-time bootstrap)
 	$(MISE) exec -- pnpm --dir app exec wrangler r2 bucket create "edgeflags-terraform-state-$(ENV)"

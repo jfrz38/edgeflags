@@ -1,7 +1,8 @@
 # EXP-0002: Cloudflare Access validation
 
-- **Status:** In progress
+- **Status:** Completed
 - **Date:** 2026-10-16
+- **Completed:** 2026-10-24
 - **Related phase:** Phase 8
 - **Related issues:** None
 
@@ -69,21 +70,53 @@ The adapted Service Auth flow passed an authenticated remote flag lifecycle on
 `200`, while an unauthenticated request to `/flags/access-validation` returned
 `401` before a Worker JSON response.
 
-Remote insufficient-scope validation and Service Token rotation remain pending.
+Remote authorization validation used a temporary second Service Token mapped
+only to `flags:read`. It read a disposable flag successfully, received `403` for
+write, evaluation, and deletion, and confirmed that the denied operations did
+not change KV. The full-scope client then removed the flag. Deployment run
+<https://github.com/jfrz38/edgeflags/actions/runs/40097383147> activated the
+temporary Access policy, and run
+<https://github.com/jfrz38/edgeflags/actions/runs/40097590029> restored the
+single-client policy before the temporary Service Token was deleted.
+
+The smoke-test Service Token was rotated while preserving an overlap in which
+both secrets passed the remote lifecycle. GitHub and the local trusted client
+adopted the replacement before deployment run
+<https://github.com/jfrz38/edgeflags/actions/runs/40097776698> passed. A final
+bounded rotation exercise repeated the overlap, deployment run
+<https://github.com/jfrz38/edgeflags/actions/runs/40098148702> passed with the
+replacement, and Access rejected the previous secret after its recorded
+expiration while the replacement continued to pass.
+
+The Service Token resource and Client Secret remain outside Terraform. Scans of
+the exercised workflow logs found neither secret; GitHub masked the authorization
+policy. Cloudflare's limits checked on 2026-10-24 allow 50 Service Tokens, and
+the Access Free plan supports service-token authentication for a project well
+below its 50-user limit.
 
 ## Conclusion
 
-Pending.
+Cloudflare Access protects the development API while leaving health public. Its
+non-identity Service Auth assertion provides a stable Client ID only after
+signature, issuer, audience, lifetime, and algorithm verification. EdgeFlags
+then applies its own fail-closed scopes independently from Access authentication.
+
+The experiment demonstrated insufficient-scope denial without KV mutation and
+credential rotation without interrupting the adopted client. The old secret was
+subsequently rejected, the temporary validation token was removed, and no Client
+Secret entered Terraform configuration, state-managed resources, or workflow
+logs. The hypothesis is accepted for the development server-to-server flow.
 
 ## Limitations
 
 - Local `ctx.access` simulation demonstrates application behavior, not the
   account's remote Access routing or identity-provider configuration.
+- The remote exercise covered Service Auth clients. Human identity adaptation is
+  automated-test coverage, not a remotely exercised identity-provider flow.
 - The free-tier limits and provider identity shape are time-sensitive.
 
 ## Follow-up
 
-- Record remote run links and sanitized observations.
-- Rerun the authenticated smoke test after adapting the non-identity Service Auth
-  flow.
-- Enable production Access only after development validation succeeds.
+- Carry the validated Access configuration into the controlled production
+  delivery work.
+- Revalidate provider behavior and limits before production activation.

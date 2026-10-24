@@ -64,9 +64,9 @@ EdgeFlags is designed around these constraints:
 
 The TypeScript Worker and Cloudflare KV binding are current. Terraform provisions
 the development namespace and development delivery applies infrastructure and
-deploys the Worker automatically. Cloudflare Access support and internal scopes
-are implemented behind coordinated activation while their remote behavior is
-validated. The telemetry path remains subject to a feasibility experiment.
+deploys the Worker automatically. Cloudflare Access protects development
+requests and internal scopes have been validated remotely for Service Auth
+clients. The telemetry path remains subject to a feasibility experiment.
 
 ## Component responsibilities
 
