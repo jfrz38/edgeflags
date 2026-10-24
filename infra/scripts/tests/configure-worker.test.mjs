@@ -21,8 +21,61 @@ test("renders an environment binding without changing the base configuration", (
 
   assert.match(config, /^name = "edgeflags"/);
   assert.match(config, /\[env\.dev\]\nname = "edgeflags-dev"/);
+  assert.match(
+    config,
+    /\[env\.dev\.vars\]\nACCESS_ENFORCEMENT_ENABLED = "false"/,
+  );
   assert.match(config, new RegExp(`id = "${namespaceId}"`));
   assert.match(config, /\[\[env\.dev\.kv_namespaces\]\][\s\S]*remote = false/);
+});
+
+test("enables Access enforcement only when explicitly requested", () => {
+  const config = renderWorkerConfig(
+    baseConfig,
+    namespaceId,
+    "dev",
+    true,
+    "https://edgeflags.cloudflareaccess.com",
+  );
+
+  assert.match(config, /ACCESS_ENFORCEMENT_ENABLED = "true"/);
+  assert.match(
+    config,
+    /ACCESS_ISSUER = "https:\/\/edgeflags\.cloudflareaccess\.com"/,
+  );
+});
+
+test("does not render an Access issuer while enforcement is disabled", () => {
+  const config = renderWorkerConfig(
+    baseConfig,
+    namespaceId,
+    "dev",
+    false,
+    "not-an-issuer",
+  );
+
+  assert.doesNotMatch(config, /ACCESS_ISSUER/);
+});
+
+test("requires a valid Cloudflare Access issuer when enforcement is enabled", () => {
+  for (const invalidIssuer of [
+    "",
+    "http://edgeflags.cloudflareaccess.com",
+    "https://example.com",
+    "https://edgeflags.cloudflareaccess.com/path",
+  ]) {
+    assert.throws(
+      () =>
+        renderWorkerConfig(
+          baseConfig,
+          namespaceId,
+          "dev",
+          true,
+          invalidIssuer,
+        ),
+      /ACCESS_ISSUER/,
+    );
+  }
 });
 
 test("renders the production environment independently", () => {

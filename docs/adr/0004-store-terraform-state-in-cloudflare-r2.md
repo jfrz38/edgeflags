@@ -106,8 +106,8 @@ of truth for infrastructure ownership.
 ## Validation / experiments
 
 - [ ] Create both private R2 buckets and bucket-scoped credentials.
-- [ ] Migrate the existing development state after preserving a private backup.
-- [ ] Verify a clean runner does not plan to recreate the development namespace.
+- [x] Migrate the existing development state after preserving a private backup.
+- [x] Verify a clean runner does not plan to recreate the development namespace.
 - [ ] Verify two concurrent operations cannot mutate the same state.
 - [ ] Restore a copied state object in a controlled recovery exercise.
 - [ ] Confirm the expected state and backup usage remains within the R2 free tier.

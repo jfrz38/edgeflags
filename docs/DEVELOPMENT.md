@@ -103,6 +103,16 @@ mise install
 make install
 ```
 
+To run the local Worker with Access enforcement, copy the non-secret local test
+configuration before `make dev`:
+
+```bash
+cp app/.dev.vars.example app/.dev.vars
+```
+
+The ignored file contains only a simulated local audience and test scopes. Never
+copy remote Access credentials into it.
+
 ## Shared commands
 
 The implemented application task interface is:
@@ -155,7 +165,8 @@ the same checks must remain part of `make check` and future pull-request gates.
 ## Development infrastructure
 
 Terraform configuration lives under `infra/`. The shared
-`infra/modules/environment` root composes `infra/modules/kv`, and Terragrunt
+`infra/modules/environment` root composes `infra/modules/kv` and optionally
+`infra/modules/access`, and Terragrunt
 instantiates it from `infra/live/dev` and `infra/live/prod`. Each environment has
 its own namespace title and private R2 state bucket. Terraform owns the
 namespaces; Wrangler owns Worker artifacts and deployment.
@@ -175,11 +186,11 @@ shell, but repository commands do not load it automatically. Never force-add it
 to Git.
 
 The Cloudflare token needs only the permissions required by the operation:
-Workers KV namespace edits for Terraform, Worker script edits for deployment, or
-R2 object edits for backup. R2 S3 access keys are separate credentials scoped to
-one state bucket. The account identifier is not secret. Both account variables
-contain the same value because the provider and backend consume different
-conventional names.
+Workers KV namespace edits for Terraform, Access Apps and Policies edits when
+Access is active, Worker script edits for deployment, or R2 object edits for
+backup. R2 S3 access keys are separate credentials scoped to one state bucket.
+The account identifier is not secret. Both account variables contain the same
+value because the provider and backend consume different conventional names.
 
 Validate both environments and create an environment-specific plan from the
 repository root:
@@ -209,7 +220,8 @@ Terragrunt is configured for separate private R2 buckets. Before its first use,
 follow the bootstrap and migration sequence in
 [Infrastructure](INFRASTRUCTURE.md). The original local state, local backups,
 saved plans, `.terraform/`, and `.terragrunt-cache/` remain ignored and private.
-Do not enable remote plans or CD until migration and locking have been verified.
+Remote plans and CD are active after the completed R2 migration. Do not set
+`ACCESS_ENABLED=true` until the Access bootstrap below is complete.
 
 After apply, deploy the Worker with the provisioned binding:
 
@@ -222,6 +234,73 @@ Wrangler configuration and Terragrunt output, then deploys `edgeflags-dev` with
 the `FLAGS_KV` binding. Do not edit or commit the generated file. This path does
 not change `make dev`: local execution continues to use local KV and cannot fall
 back to Cloudflare resources.
+
+## Cloudflare Access development
+
+Local Wrangler configuration simulates an authenticated Access application with
+the `local-development` audience. Its committed authorization policy contains
+only test scopes and is not a remote credential. Tests inject Access context at
+the Worker boundary and cover missing identity, unknown principals, and
+insufficient scopes.
+
+For remote development, create a Service Token from a trusted terminal:
+
+```bash
+make access-token-create ENV=dev
+```
+
+The bootstrap `CLOUDFLARE_API_TOKEN` requires `Access: Service Tokens Write`.
+This permission is not required by normal Worker traffic and should not be added
+to the smoke-test Service Token.
+
+Store the returned Client ID and Client Secret immediately in the GitHub `dev`
+environment. Add the token resource ID to the comma-separated
+`DEV_ACCESS_SERVICE_TOKEN_IDS` variable, store the Worker hostname as
+`DEV_ACCESS_HOSTNAME`, store the Access organization issuer as
+`DEV_ACCESS_ISSUER`, and store the identity-to-scope mapping as the
+`AUTHORIZATION_POLICY` secret. The issuer is an HTTPS origin such as
+`https://team.cloudflareaccess.com`. Never place a Client Secret in Terraform
+inputs or state.
+
+Cloudflare validates the Service Token Client ID and Client Secret before the
+request reaches the Worker. Service Auth is a non-identity flow in remote
+development, so the Worker verifies the signed `Cf-Access-Jwt-Assertion`
+against the configured issuer and `ctx.access.aud`, then uses its `common_name`
+Client ID as the stable application principal:
+
+```json
+{
+  "service:<access-client-id>": [
+    "flags:read",
+    "flags:write",
+    "flags:evaluate"
+  ]
+}
+```
+
+Configure the GitHub authorization policy, smoke-test secrets, and token ID list
+before setting `ACCESS_ENABLED=true`. Each additional automated consumer gets a
+separate Service Token, an entry in `DEV_ACCESS_SERVICE_TOKEN_IDS`, and its own
+`service:<access-client-id>` authorization entry. The Access audience is never a
+client identity and cannot grant scopes.
+
+Human identities prefer `user:<user_uuid>`; `user:<verified-email>` is available
+for initial bootstrap before the UUID has been recorded. Human identity takes
+precedence over a supplied assertion. An unverified JWT, other provider fields,
+and the Access audience alone do not grant scopes.
+
+The first enabled deployment confirms Terraform's Access configuration and turns
+on application enforcement. To rotate with a 24-hour overlap, run:
+
+```bash
+make access-token-rotate ENV=dev
+```
+
+Update GitHub with the replacement secret before the overlap expires.
+Cloudflare revokes the previous secret at the configured timestamp. For an
+emergency revocation, disable or delete the Service Token under Zero Trust
+**Access controls > Service credentials**, then create a replacement before
+reenabling automated deployment.
 
 To remove the namespace after deleting any deployed Worker that consumes it:
 
@@ -257,8 +336,9 @@ rejected before they can contact Cloudflare.
 
 ### Remote validation
 
-After applying the development namespace and deploying the Worker, run
-`make smoke ENV=dev BASE_URL=https://...`. The automated check:
+After applying development infrastructure and deploying the Worker, run
+`make smoke ENV=dev BASE_URL=https://...`. When Access is active, export
+`ACCESS_CLIENT_ID` and `ACCESS_CLIENT_SECRET` first. The automated check:
 
 1. Verifies the root health response.
 2. Creates a uniquely named disposable flag.
@@ -287,7 +367,9 @@ Configuration must distinguish public identifiers from credentials:
 | Cloudflare account identifier | Account selection | No |
 | Cloudflare API token | Infrastructure and deployment authentication | Yes |
 | KV namespace and Worker binding names | Storage configuration | No |
-| API credential hashing secret, if selected | Credential protection | Yes |
+| Access Service Token resource IDs, hostname, and issuer | Access and Worker security configuration | No |
+| Access Client ID and Client Secret | Automated client authentication | Yes |
+| Authorization policy | Internal identity-to-scope mapping | Yes |
 | External telemetry credentials, if enabled | Observability export | Yes |
 
 Local secrets should use mechanisms supported by Wrangler and mise. CI/CD

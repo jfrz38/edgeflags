@@ -1,9 +1,22 @@
-import { env, exports } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import worker from "../src/index";
+import { CloudflareAccessAssertionVerifier } from "../src/infrastructure/auth/cloudflare-access-assertion-verifier";
+
+beforeAll(() => {
+  vi.spyOn(
+    CloudflareAccessAssertionVerifier.prototype,
+    "verify",
+  ).mockResolvedValue("local-test-token");
+});
+
+afterAll(() => {
+  vi.restoreAllMocks();
+});
 
 describe("EdgeFlags Worker", () => {
   it("identifies the service from the root endpoint", async () => {
-    const response = await exports.default.fetch("https://edgeflags.test/");
+    const response = await fetchWorker(new Request("https://edgeflags.test/"));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/json");
@@ -84,7 +97,7 @@ describe("EdgeFlags Worker", () => {
   });
 
   it("requires JSON for PUT requests", async () => {
-    const response = await exports.default.fetch(
+    const response = await fetchWorker(
       new Request("https://edgeflags.test/flags/content-type-check", {
         method: "PUT",
         body: "enabled=true",
@@ -116,7 +129,7 @@ describe("EdgeFlags Worker", () => {
     [JSON.stringify({ enabled: "true" }), "a non-boolean value"],
     [JSON.stringify({ enabled: true, extra: true }), "an unknown property"],
   ])("rejects %s as an invalid request", async (body) => {
-    const response = await exports.default.fetch(
+    const response = await fetchWorker(
       new Request("https://edgeflags.test/flags/invalid-body-check", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -136,12 +149,40 @@ function request(
   path: string,
   body?: unknown,
 ): Promise<Response> {
-  return exports.default.fetch(
+  return fetchWorker(
     new Request(`https://edgeflags.test${path}`, {
       method,
       headers:
         body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
+  );
+}
+
+function fetchWorker(request: Request): Promise<Response> {
+  const headers = new Headers(request.headers);
+  headers.set("Cf-Access-Jwt-Assertion", "signed-access-assertion");
+  const authenticatedRequest = new Request(request, { headers });
+
+  return worker.fetch(
+    authenticatedRequest as Parameters<typeof worker.fetch>[0],
+    {
+      ...env,
+      ACCESS_ENFORCEMENT_ENABLED: "true",
+      ACCESS_ISSUER: "https://edgeflags.cloudflareaccess.com",
+      AUTHORIZATION_POLICY: JSON.stringify({
+        "service:local-test-token": [
+          "flags:read",
+          "flags:write",
+          "flags:evaluate",
+        ],
+      }),
+    },
+    {
+      access: {
+        aud: "local-development",
+        getIdentity: async () => undefined,
+      },
+    } as unknown as ExecutionContext,
   );
 }

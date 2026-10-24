@@ -62,10 +62,11 @@ EdgeFlags is designed around these constraints:
                          +-------------------+
 ```
 
-The TypeScript Worker and its local Cloudflare KV binding are current. Terraform
-configuration can provision a development KV namespace, while remote apply and
-deployment remain explicit operator actions. The telemetry path is subject to a
-feasibility experiment before it becomes part of the default deployment.
+The TypeScript Worker and Cloudflare KV binding are current. Terraform provisions
+the development namespace and development delivery applies infrastructure and
+deploys the Worker automatically. Cloudflare Access support and internal scopes
+are implemented behind coordinated activation while their remote behavior is
+validated. The telemetry path remains subject to a feasibility experiment.
 
 ## Component responsibilities
 
@@ -225,19 +226,38 @@ Expected consistency experiments include:
 
 ## Security boundaries
 
-The target API security model includes:
+Cloudflare Access authenticates human operators and automated clients before
+protected requests reach the Worker. Direct Worker invocations expose the
+authenticated Access context through `ctx.access`; infrastructure translates
+human identity from `getIdentity()` and non-identity Service Auth from the
+cryptographically verified `Cf-Access-Jwt-Assertion` into a stable internal
+client identity. Verification pins the Access issuer, application audience, and
+RS256 algorithm before accepting the assertion's Service Token Client ID.
+Cloudflare details do not enter application or domain code.
 
-- API keys supplied through `X-API-Key`,
-- non-plaintext credential storage,
-- stable client identification,
-- operation-specific scopes,
-- key rotation and revocation,
-- rate limits by client or IP where feasible, and
-- audit events for security-relevant operations.
+EdgeFlags owns method-level authorization through `flags:read`, `flags:write`,
+and `flags:evaluate`. The environment authorization policy is a Worker secret.
+Missing identity, malformed policy, unknown principals, and insufficient scopes
+fail closed. Access Service Tokens provide automation credentials and are
+created outside Terraform so their one-time Client Secrets do not enter remote
+state. Each automated consumer uses a distinct token and is authorized through
+the stable Service Token Client ID exposed by Access; an application audience is
+never treated as a client identity.
 
-Candidate scopes are `flags:read`, `flags:write`, and `flags:admin`. Their exact
-permissions and the credential hashing design will be decided during the API
-security phase.
+```text
+Client -> Cloudflare Access -> Access identity -> scope policy
+       -> HTTP handler -> use case -> environment KV namespace
+```
+
+Authentication does not imply ownership. All authorized clients in an
+environment operate on its shared flags. Multi-tenancy and per-user KV
+namespaces remain non-goals. Rate limits by client or IP and security audit
+events belong to later phases.
+
+The protected API is initially server-to-server. Service Token secrets must not
+be embedded in browser, mobile, or other publicly distributed clients; those
+clients must call through a trusted backend unless a separate public evaluation
+contract is designed later.
 
 Secrets must not be committed to the repository. They must also be kept out of
 Terraform state where practical.

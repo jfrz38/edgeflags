@@ -1,9 +1,9 @@
 # EdgeFlags Delivery
 
 This document defines the branch, environment, and delivery model. Pull request
-CI, protected remote development plans, and development deployment automation
-are implemented. Remote operations remain disabled until R2 and GitHub
-environments are bootstrapped and validated.
+CI, environment-scoped remote development plans, R2 state, and automatic
+development deployments are active. Cloudflare Access integration is implemented
+behind coordinated activation while its remote identity behavior is validated.
 
 ## Branch model
 
@@ -38,7 +38,7 @@ The Terragrunt configuration contains distinct `dev` and `prod` environments.
 
 | Environment | Purpose | Branch relationship |
 | --- | --- | --- |
-| `dev` | Integration and deployed experiments | Deploys each integrated push to `develop` after activation |
+| `dev` | Integration and deployed experiments | Deploys each integrated push to `develop` |
 | `prod` | Stable release behavior | Deployed from `main` after promotion |
 
 Separating these environments is intentionally educational even though the
@@ -81,7 +81,7 @@ an automated cost estimate because Infracost does not price the current
 Cloudflare resources. Cloudflare's documented free allowances and the static
 inventory remain the applicable cost review.
 
-The workflow contains a protected remote development plan job. It runs only for
+The workflow contains an environment-scoped remote development plan job. It runs only for
 same-repository pull requests after `R2_STATE_ENABLED=true` is configured, uses
 the `dev-plan` GitHub environment, and emits only create/update/replace/delete
 counts. The saved plan is not published or reused after merge.
@@ -110,13 +110,12 @@ smoke tests
 ```
 
 Development deploys on every push integrated into `develop` and supports a
-controlled `workflow_dispatch` rerun. The workflow remains dormant until
-`DEV_CD_ENABLED=true` is configured. It serializes all development deployments
-without cancelling one in progress.
+controlled `workflow_dispatch` rerun. `DEV_CD_ENABLED=true` is configured and
+the workflow serializes all deployments without cancelling one in progress.
 
 ## Development deployment flow
 
-After R2 migration and GitHub environment activation, development follows:
+Development follows:
 
 ```text
 push to develop or controlled rerun
@@ -137,9 +136,31 @@ Worker deploy -> disposable-flag smoke test
 Terraform owns each KV namespace. Wrangler owns Worker deployment and reads the
 development namespace ID from Terragrunt output through an ignored generated
 configuration. Production apply and deployment remain unavailable until API
-authentication exists. The workflows are committed before activation so the R2
-migration, lock behavior, environment protections, and credentials can be
-verified without triggering a partial deployment.
+authentication is remotely validated.
+
+## Cloudflare Access activation
+
+Access infrastructure and Worker enforcement share `ACCESS_ENABLED`. Keep it
+false until the development Service Token, repository variables, authorization
+policy, and smoke-test secrets are configured. Activation requires:
+
+- repository variables `DEV_ACCESS_HOSTNAME`, comma-separated
+  `DEV_ACCESS_SERVICE_TOKEN_IDS`, `DEV_ACCESS_ISSUER`, optional
+  `DEV_ACCESS_ALLOWED_EMAILS`, and `ACCESS_ENABLED=true`;
+- GitHub `dev` secrets `ACCESS_CLIENT_ID`, `ACCESS_CLIENT_SECRET`, and
+  `AUTHORIZATION_POLICY`.
+
+Terraform manages the Access application and policies, but not the Service
+Token. Creating that token with Terraform would persist its one-time Client
+Secret in R2 state. `make access-token-create ENV=dev` performs the explicit
+bootstrap from a trusted terminal using an API token with `Access: Service
+Tokens Write`. Once active, the smoke test authenticates every request with that
+Service Token.
+
+Create the initial token, configure its resource ID, Client ID authorization
+principal, smoke-test credentials, and hostname before enabling the normal
+deployment workflow. Additional clients use separate Service Tokens so they can
+be authorized, rotated, and revoked independently.
 
 ## Promotion requirements
 
@@ -169,6 +190,10 @@ token. `dev` uses its own R2 credentials, a Cloudflare infrastructure/deployment
 token, and a separate R2 backup token. `CLOUDFLARE_ACCOUNT_ID` and `DEV_BASE_URL`
 are non-secret environment variables. No production deployment credentials are
 configured during this iteration.
+
+When Access is enabled, the plan token also needs Access Apps and Policies Read,
+and the deployment token needs Access Apps and Policies Write. Service Token
+credentials remain separate from Cloudflare API tokens and R2 credentials.
 
 Production deployment should use a protected GitHub environment if that feature
 fits the selected repository plan.
