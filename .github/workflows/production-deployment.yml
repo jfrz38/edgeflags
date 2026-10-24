@@ -1,9 +1,6 @@
 name: Production Deployment
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -110,5 +107,5 @@ jobs:
             '- Environment: `prod`' \
             '- Result: `${{ job.status }}`' \
             '' \
-            'Production requires environment approval. A failed smoke test marks the deployment as failed; Terraform is never rolled back automatically.' \
+            'Production is started manually from main. A failed smoke test marks the deployment as failed; Terraform is never rolled back automatically.' \
             >> "$GITHUB_STEP_SUMMARY"

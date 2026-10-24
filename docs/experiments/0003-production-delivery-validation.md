@@ -7,7 +7,7 @@
 
 ## Hypothesis
 
-An approved promotion from `develop` to `main` can use isolated production
+An operator-authorized production dispatch from `main` can use isolated production
 credentials and R2 state to apply the reviewed infrastructure, deploy a
 Cloudflare Access-protected Worker, and pass a disposable authenticated flag
 lifecycle without exceeding the current free allowances. The state lock and a
@@ -20,7 +20,7 @@ lifecycle without exceeding the current free allowances. The state lock and a
   free allowance for the bounded validation.
 - The production R2 bucket and independent plan, state, and backup credentials
   exist.
-- `prod-plan` and approval-protected `prod` GitHub environments contain the
+- `prod-plan` and main-restricted `prod` GitHub environments contain the
   variables and secrets documented in `DELIVERY.md`.
 - A production-only Access Service Token exists outside Terraform state and is
   the only principal in `AUTHORIZATION_POLICY`.
@@ -38,8 +38,8 @@ lifecycle without exceeding the current free allowances. The state lock and a
    unexpected actions. Never perform this exercise through CI.
 4. Confirm backup objects older than 30 days are removed and current state is
    never selected by retention.
-5. Enable `PROD_CD_ENABLED`, merge the reviewed promotion to `main`, and approve
-   the `prod` environment.
+5. Enable `PROD_CD_ENABLED`, merge the reviewed promotion to `main`, and manually
+   dispatch the production workflow from `main`.
 6. Confirm the workflow safely skips the pre-apply backup when no production
    state exists, applies its newly saved plan, and deploys `edgeflags-prod`.
 7. Confirm health is public, an unauthenticated protected request returns `401`,
@@ -52,7 +52,7 @@ lifecycle without exceeding the current free allowances. The state lock and a
 ## Expected result
 
 The separate plan credential cannot mutate Cloudflare resources, production
-requires explicit environment approval, state locking prevents concurrent
+requires explicit manual dispatch from `main`, state locking prevents concurrent
 mutation, restoration returns state to the recorded checksum, and the first
 deployment completes with Access enforced. The smoke flag is removed, a later
 plan contains no unexpected changes, and measured usage remains within current

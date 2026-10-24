@@ -5,7 +5,7 @@ CI, environment-scoped remote development plans, R2 state, and automatic
 development deployments are active. Cloudflare Access and EdgeFlags authorization
 are active and remotely validated in development. The production plan and
 deployment workflows are implemented but remain disabled pending bootstrap and
-the first approved promotion.
+the first manually authorized promotion.
 
 ## Branch model
 
@@ -108,6 +108,9 @@ required CI checks
 merge to main
           |
           v
+manual workflow dispatch from main
+          |
+          v
 infrastructure apply
           |
           v
@@ -143,16 +146,17 @@ Worker deploy -> disposable-flag smoke test
 
 Terraform owns each KV namespace. Wrangler owns Worker deployment and reads the
 development namespace ID from Terragrunt output through an ignored generated
-configuration. Production uses the same ordering in a separate workflow after a
-merge to `main`. Its `prod` GitHub environment must require approval. The
-workflow always enables Access, backs up existing state, creates and applies a
-fresh exact plan, deploys `edgeflags-prod`, and verifies both unauthenticated
-denial and an authenticated disposable-flag lifecycle. The first run permits the
-absence of a state object because no production resources have yet been applied.
+configuration. Production uses the same ordering in a separate workflow started
+manually from `main` after promotion. The `prod` environment permits deployments
+only from `main`. The workflow always enables Access, backs up existing state,
+creates and applies a fresh exact plan, deploys `edgeflags-prod`, and verifies
+both unauthenticated denial and an authenticated disposable-flag lifecycle. The
+first run permits the absence of a state object because no production resources
+have yet been applied.
 
 Production remains inert while the repository variable `PROD_CD_ENABLED` is not
-`true`. Workflow dispatch follows the same gate and approval; it is a controlled
-rerun, not a bypass.
+`true`. A merge never deploys by itself: `workflow_dispatch` is the explicit
+operator authorization and must target `main`.
 
 ## Cloudflare Access activation
 
@@ -195,7 +199,8 @@ Before enabling either production workflow:
 3. Create `prod-plan` with `TERRAFORM_STATE_ACCESS_KEY_ID`,
    `TERRAFORM_STATE_SECRET_ACCESS_KEY`, and a read-only
    `CLOUDFLARE_PLAN_API_TOKEN`.
-4. Create protected `prod` with the state credentials,
+4. Create `prod`, restrict its deployment branch policy to `main`, and configure
+   the state credentials,
    `R2_BACKUP_ACCESS_KEY_ID`, `R2_BACKUP_SECRET_ACCESS_KEY`,
    `CLOUDFLARE_DEPLOY_API_TOKEN`, `AUTHORIZATION_POLICY`, `ACCESS_CLIENT_ID`, and
    `ACCESS_CLIENT_SECRET`.
@@ -217,12 +222,13 @@ Before promotion to `main`:
 
 - required CI checks must pass,
 - infrastructure changes must have a reviewed plan,
-- required secrets and environment approvals must be configured,
+- required secrets and the manual production trigger must be configured,
 - migrations or compatibility concerns must be documented, and
 - smoke-test expectations must be known.
 
-The exact GitHub protection rules and deployment approval policy are not
-configured by the repository and must not be assumed to exist.
+The repository's private GitHub plan does not support required environment
+reviewers. Manual dispatch from `main`, the environment branch policy, and
+`PROD_CD_ENABLED` form the production authorization gate.
 
 ## Credentials and permissions
 
@@ -244,9 +250,9 @@ When Access is enabled, the plan token also needs Access Apps and Policies Read,
 and the deployment token needs Access Apps and Policies Write. Service Token
 credentials remain separate from Cloudflare API tokens and R2 credentials.
 
-Production deployment requires a protected GitHub environment with an explicit
-approval rule. If the selected repository plan cannot provide that control,
-`PROD_CD_ENABLED` must remain false.
+Production deployment requires the `prod` environment to accept only `main`.
+Required reviewers can replace or supplement manual dispatch if a future GitHub
+plan supports them.
 
 ## Failure and recovery
 

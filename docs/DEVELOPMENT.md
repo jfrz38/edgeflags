@@ -213,8 +213,8 @@ make infra-show ENV=prod
 require the R2 backend variables shown above. Plans are written as
 ignored `edgeflags-<environment>.tfplan` files. Changes to code, inputs,
 credentials, or state require a new plan. Production mutation is available only
-through an explicitly protected configuration and is intended for the
-approval-gated workflow. Destroy and local-state migration remain restricted to
+through an explicitly protected configuration and is intended for the manually
+dispatched workflow. Destroy and local-state migration remain restricted to
 `ENV=dev`.
 
 After reviewing the development plan, apply it explicitly:

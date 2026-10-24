@@ -18,7 +18,8 @@ The repository contains a reproducible development toolchain, a local and remote
 KV-backed Worker, Terragrunt composition for distinct `dev` and `prod`
 infrastructure, credential-free pull request validation, environment-scoped
 remote plans, automatic development deployment with remote smoke tests, and a
-production promotion path guarded by a separate plan environment and approval.
+production promotion path guarded by a separate plan environment and a manual
+dispatch restricted to `main`.
 
 The remaining infrastructure and broader architecture described in the
 documentation are target outcomes. They will become available incrementally as
@@ -183,9 +184,9 @@ Git allows contributors to skip.
 - Development branches merge into `develop` through pull requests.
 - `develop` is the integration branch for ongoing work.
 - `main` contains the stable state of the project.
-- Promoting `develop` to `main` represents a production release. Once
-  `PROD_CD_ENABLED=true` is deliberately configured, the merge triggers the
-  approval-gated production workflow.
+- Promoting `develop` to `main` prepares a production release. Once
+  `PROD_CD_ENABLED=true` is deliberately configured, an operator starts the
+  production workflow manually from `main`.
 
 See [Delivery](docs/DELIVERY.md) for the complete target workflow.
 

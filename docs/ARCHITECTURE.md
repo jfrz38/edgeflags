@@ -66,7 +66,7 @@ The TypeScript Worker and Cloudflare KV binding are current. Terraform provision
 the development namespace and development delivery applies infrastructure and
 deploys the Worker automatically. Cloudflare Access protects development
 requests and internal scopes have been validated remotely for Service Auth
-clients. An isolated, approval-gated production path is implemented but remains
+clients. An isolated, manually gated production path is implemented but remains
 inactive until bootstrap and remote validation. The telemetry path remains
 subject to a feasibility experiment.
 
