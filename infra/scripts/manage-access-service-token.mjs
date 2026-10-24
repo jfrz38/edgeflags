@@ -8,6 +8,8 @@ export async function manageAccessServiceToken({
   accountId,
   apiToken,
   serviceTokenId,
+  serviceTokenName = `edgeflags-${environment}-smoke`,
+  rotationOverlapMilliseconds = 24 * 60 * 60 * 1_000,
   fetch: fetchRequest = globalThis.fetch,
   now = () => Date.now(),
 }) {
@@ -24,37 +26,55 @@ export async function manageAccessServiceToken({
   let body;
 
   if (action === "create") {
+    if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(serviceTokenName)) {
+      throw new Error(
+        "ACCESS_SERVICE_TOKEN_NAME must be a lowercase kebab-case name",
+      );
+    }
     body = {
-      name: `edgeflags-${environment}-smoke`,
+      name: serviceTokenName,
       duration: "8760h",
     };
   } else if (action === "rotate") {
     if (!/^[0-9a-f-]{36}$/.test(serviceTokenId ?? "")) {
       throw new Error("ACCESS_SERVICE_TOKEN_ID is required for rotation");
     }
+    if (
+      !Number.isInteger(rotationOverlapMilliseconds) ||
+      rotationOverlapMilliseconds < 60_000
+    ) {
+      throw new Error("Rotation overlap must be at least 60 seconds");
+    }
     url = `${baseUrl}/${serviceTokenId}/rotate`;
     body = {
       previous_client_secret_expires_at: new Date(
-        now() + 24 * 60 * 60 * 1_000,
+        now() + rotationOverlapMilliseconds,
       ).toISOString(),
     };
+  } else if (action === "delete") {
+    if (!/^[0-9a-f-]{36}$/.test(serviceTokenId ?? "")) {
+      throw new Error("ACCESS_SERVICE_TOKEN_ID is required for deletion");
+    }
+    url = `${baseUrl}/${serviceTokenId}`;
   } else {
-    throw new Error("Action must be create or rotate");
+    throw new Error("Action must be create, rotate, or delete");
   }
 
   const response = await fetchRequest(url, {
-    method: "POST",
+    method: action === "delete" ? "DELETE" : "POST",
     headers: {
       Authorization: `Bearer ${apiToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   const payload = await response.json();
 
   if (!response.ok || payload.success !== true) {
     throw new Error(`Cloudflare rejected Access token ${action}`);
   }
+
+  if (action === "delete") return { id: serviceTokenId };
 
   const result = payload.result;
   if (!result?.id || !result.client_id || !result.client_secret) {
@@ -81,16 +101,25 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
     apiToken: process.env.CLOUDFLARE_API_TOKEN,
     serviceTokenId: process.env.ACCESS_SERVICE_TOKEN_ID,
+    serviceTokenName: process.env.ACCESS_SERVICE_TOKEN_NAME,
+    rotationOverlapMilliseconds:
+      process.env.ACCESS_TOKEN_ROTATION_OVERLAP_SECONDS === undefined
+        ? undefined
+        : Number(process.env.ACCESS_TOKEN_ROTATION_OVERLAP_SECONDS) * 1_000,
   });
 
-  console.log("Store these values immediately; the client secret is shown once:");
-  console.log(`ACCESS_SERVICE_TOKEN_ID=${result.id}`);
-  console.log(`ACCESS_CLIENT_ID=${result.clientId}`);
-  console.log(`ACCESS_CLIENT_SECRET=${result.clientSecret}`);
-  console.log(`ACCESS_TOKEN_EXPIRES_AT=${result.expiresAt}`);
-  if (result.previousClientSecretExpiresAt) {
-    console.log(
-      `PREVIOUS_ACCESS_SECRET_EXPIRES_AT=${result.previousClientSecretExpiresAt}`,
-    );
+  if (process.argv[2] === "delete") {
+    console.log("Access Service Token deleted");
+  } else {
+    console.log("Store these values immediately; the client secret is shown once:");
+    console.log(`ACCESS_SERVICE_TOKEN_ID=${result.id}`);
+    console.log(`ACCESS_CLIENT_ID=${result.clientId}`);
+    console.log(`ACCESS_CLIENT_SECRET=${result.clientSecret}`);
+    console.log(`ACCESS_TOKEN_EXPIRES_AT=${result.expiresAt}`);
+    if (result.previousClientSecretExpiresAt) {
+      console.log(
+        `PREVIOUS_ACCESS_SECRET_EXPIRES_AT=${result.previousClientSecretExpiresAt}`,
+      );
+    }
   }
 }

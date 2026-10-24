@@ -11,8 +11,9 @@ observability, and site reliability engineering.
 
 ## Current status
 
-Phases 1 through 6 are complete, development delivery from Phase 7 is
-operational, and Phase 8 API security is in progress. The repository
+Phases 1 through 6 and Phase 8 API security are complete, while development
+delivery from Phase 7 is operational and production delivery remains pending.
+The repository
 contains a reproducible development toolchain, a local and remotely validated
 KV-backed Worker, Terragrunt composition for distinct `dev` and `prod`
 infrastructure, credential-free pull request validation, environment-scoped
@@ -100,8 +101,8 @@ flowchart LR
 Local checks exercise the Terraform output contract, the same configuration
 generator used for deployment, the Worker HTTP lifecycle, and an isolated local
 KV implementation. They never contact Cloudflare. The remote development path
-has been validated manually; its automated workflow remains disabled until R2
-state migration, locking, recovery, and scoped GitHub credentials are verified.
+is automated with R2 state backup, exact-plan apply, Worker deployment, Access
+authentication, and a post-deployment smoke test.
 The initial product scope is intentionally small: create, read, delete, and
 evaluate boolean feature flags. Later phases add security, deterministic
 rollouts, targeting, interoperability, and operational experiments.
@@ -157,6 +158,7 @@ make infra-plan ENV=dev
 make infra-plan ENV=prod
 make access-token-create ENV=dev
 make access-token-rotate ENV=dev
+make access-validate ENV=dev BASE_URL=https://...
 make pre-commit
 make check
 ```

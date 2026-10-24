@@ -5,10 +5,10 @@ the order, scope, and observable outcome of each phase. The
 [README](../README.md) provides only a summary and must not maintain a separate
 phase list.
 
-EdgeFlags has completed **Phases 1 through 6**. Phase 7's development delivery
-path is operational: merges to `develop` back up remote state, apply the reviewed
-plan, deploy the Worker, and pass a remote smoke test. Production delivery
-remains pending until Phase 8 protects the API.
+EdgeFlags has completed **Phases 1 through 6 and Phase 8**. Phase 7's development
+delivery path is operational: merges to `develop` back up remote state, apply the
+reviewed plan, deploy the Worker, and pass an authenticated remote smoke test.
+Production delivery is the remaining Phase 7 work now that the API is protected.
 
 ## Planning model
 
@@ -241,7 +241,7 @@ against a newly deployed release.
 
 Development CD, environment-scoped remote plans, R2 state backups, exact-plan
 apply, Worker deployment, and smoke tests are active and have completed
-successfully. Production deployment remains blocked until Phase 8 protects the
+successfully. Production deployment can proceed now that Phase 8 protects the
 public API. Remaining state recovery exercises are operational hardening rather
 than a blocker for API security.
 
@@ -276,7 +276,13 @@ orchestration.
 
 ## Phase 8 - API security
 
-**Status:** In progress since 2026-10-16.
+**Status:** Completed on 2026-10-24.
+
+Development Access rejects unauthenticated protected requests, maps verified
+human and Service Auth context to internal identities, and enforces operation
+scopes. Remote checks demonstrated insufficient-scope denial without KV mutation,
+authenticated deployment smoke tests, overlapping Service Token rotation, and
+rejection of the previous secret after replacement adoption.
 
 ### Objective
 

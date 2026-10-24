@@ -122,7 +122,7 @@ infra-apply: check-mutable-infra-env ## Apply the reviewed development plan
 infra-destroy: check-mutable-infra-env ## Destroy development resources after confirmation
 	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- destroy
 
-.PHONY: configure-worker configure-worker-secret deploy smoke access-token-create access-token-rotate
+.PHONY: configure-worker configure-worker-secret deploy smoke access-validate access-token-create access-token-rotate access-token-delete
 configure-worker: check-infra-env ## Generate ignored Wrangler configuration for ENV
 	$(MISE) exec -- node infra/scripts/configure-worker.mjs "$(ENV)"
 
@@ -142,11 +142,19 @@ smoke: check-mutable-infra-env ## Exercise health and a disposable flag against 
 	@if [ "$$ACCESS_ENABLED" = "true" ] && { [ -z "$$ACCESS_CLIENT_ID" ] || [ -z "$$ACCESS_CLIENT_SECRET" ]; }; then printf '%s\n' "ACCESS_CLIENT_ID and ACCESS_CLIENT_SECRET are required when Access is enabled"; exit 1; fi
 	BASE_URL="$(BASE_URL)" $(MISE) exec -- node infra/scripts/smoke-worker.mjs
 
+access-validate: check-mutable-infra-env ## Validate remote Access authentication and limited read authorization
+	@if [ -z "$(BASE_URL)" ]; then printf '%s\n' "BASE_URL is required"; exit 1; fi
+	@if [ -z "$$ACCESS_CLIENT_ID" ] || [ -z "$$ACCESS_CLIENT_SECRET" ] || [ -z "$$LIMITED_ACCESS_CLIENT_ID" ] || [ -z "$$LIMITED_ACCESS_CLIENT_SECRET" ]; then printf '%s\n' "Full-scope and limited-scope Access credentials are required"; exit 1; fi
+	BASE_URL="$(BASE_URL)" $(MISE) exec -- node infra/scripts/validate-access-authorization.mjs
+
 access-token-create: check-mutable-infra-env check-cloudflare-account check-cloudflare-token ## Create a development Access Service Token outside Terraform state
 	$(MISE) exec -- node infra/scripts/manage-access-service-token.mjs create "$(ENV)"
 
 access-token-rotate: check-mutable-infra-env check-cloudflare-account check-cloudflare-token ## Rotate the development Access Service Token with a 24-hour overlap
 	$(MISE) exec -- node infra/scripts/manage-access-service-token.mjs rotate "$(ENV)"
+
+access-token-delete: check-mutable-infra-env check-cloudflare-account check-cloudflare-token ## Delete a development Access Service Token by resource ID
+	$(MISE) exec -- node infra/scripts/manage-access-service-token.mjs delete "$(ENV)"
 
 infra-state-bootstrap: check-infra-env check-cloudflare-account check-cloudflare-token ## Create the R2 state bucket for ENV (one-time bootstrap)
 	$(MISE) exec -- pnpm --dir app exec wrangler r2 bucket create "edgeflags-terraform-state-$(ENV)"
