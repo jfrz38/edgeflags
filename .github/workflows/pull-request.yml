@@ -73,7 +73,7 @@ jobs:
             '- The application job verifies the generated development binding against the Worker and local KV runtime.' \
             '- Desired inventory: `edgeflags-dev-flags` and `edgeflags-prod-flags` KV namespaces.' \
             '' \
-            'A separate protected job produces a remote development plan after R2 state is enabled. Infracost does not price Cloudflare KV resources.' \
+            'Protected jobs produce environment-specific remote plans after their R2 state is enabled. Infracost does not price Cloudflare KV resources.' \
              >> "$GITHUB_STEP_SUMMARY"
 
   remote-plan:
@@ -115,6 +115,47 @@ jobs:
 
       - name: Publish plan summary
         run: make infra-plan-summary ENV=dev >> "$GITHUB_STEP_SUMMARY"
+
+  production-plan:
+    name: Production plan
+    if: >-
+      github.base_ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      vars.PROD_R2_STATE_ENABLED == 'true'
+    needs: infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: prod-plan
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.TERRAFORM_STATE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TERRAFORM_STATE_SECRET_ACCESS_KEY }}
+      AWS_EC2_METADATA_DISABLED: "true"
+      ACCESS_ALLOWED_EMAILS: ""
+      ACCESS_ENABLED: "true"
+      ACCESS_HOSTNAME: ${{ vars.PROD_ACCESS_HOSTNAME }}
+      ACCESS_SERVICE_TOKEN_IDS: ${{ vars.PROD_ACCESS_SERVICE_TOKEN_IDS }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PLAN_API_TOKEN }}
+      TF_VAR_cloudflare_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install pinned toolchain
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          version: 2026.8.14
+
+      - name: Plan production infrastructure
+        run: make infra-plan ENV=prod
+
+      - name: Publish plan summary
+        run: make infra-plan-summary ENV=prod >> "$GITHUB_STEP_SUMMARY"
 
   security:
     name: Security

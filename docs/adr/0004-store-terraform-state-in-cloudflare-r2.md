@@ -120,3 +120,8 @@ of truth for infrastructure ownership.
   setting `DEV_CD_ENABLED=true`.
 - Define retention for objects under each bucket's `backups/` prefix.
 - Keep production apply and deployment disabled until API authentication exists.
+
+The production workflow now applies 30-day retention while taking each backup
+and safely handles the first apply when no state object exists. Production
+activation remains disabled until the unchecked lock, restore, and free-tier
+validations above are exercised and recorded in EXP-0003.

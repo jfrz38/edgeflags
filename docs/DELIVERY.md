@@ -3,7 +3,9 @@
 This document defines the branch, environment, and delivery model. Pull request
 CI, environment-scoped remote development plans, R2 state, and automatic
 development deployments are active. Cloudflare Access and EdgeFlags authorization
-are active and remotely validated in development.
+are active and remotely validated in development. The production plan and
+deployment workflows are implemented but remain disabled pending bootstrap and
+the first manually authorized promotion.
 
 ## Branch model
 
@@ -86,6 +88,12 @@ same-repository pull requests after `R2_STATE_ENABLED=true` is configured, uses
 the `dev-plan` GitHub environment, and emits only create/update/replace/delete
 counts. The saved plan is not published or reused after merge.
 
+Pull requests targeting `main` can also run an isolated production plan after
+`PROD_R2_STATE_ENABLED=true` is configured. This job uses the `prod-plan`
+environment, read-only Cloudflare authority, production-only R2 credentials, and
+publishes only action counts. It never receives deployment, backup, Worker
+secret, or Access Client Secret credentials.
+
 ## Target deployment flow
 
 The stable release flow is:
@@ -98,6 +106,9 @@ required CI checks
           |
           v
 merge to main
+          |
+          v
+manual workflow dispatch from main
           |
           v
 infrastructure apply
@@ -135,8 +146,17 @@ Worker deploy -> disposable-flag smoke test
 
 Terraform owns each KV namespace. Wrangler owns Worker deployment and reads the
 development namespace ID from Terragrunt output through an ignored generated
-configuration. Production apply and deployment remain unavailable until the
-controlled production delivery path is implemented.
+configuration. Production uses the same ordering in a separate workflow started
+manually from `main` after promotion. The `prod` environment permits deployments
+only from `main`. The workflow always enables Access, backs up existing state,
+creates and applies a fresh exact plan, deploys `edgeflags-prod`, and verifies
+both unauthenticated denial and an authenticated disposable-flag lifecycle. The
+first run permits the absence of a state object because no production resources
+have yet been applied.
+
+Production remains inert while the repository variable `PROD_CD_ENABLED` is not
+`true`. A merge never deploys by itself: `workflow_dispatch` is the explicit
+operator authorization and must target `main`.
 
 ## Cloudflare Access activation
 
@@ -162,18 +182,53 @@ principal, smoke-test credentials, and hostname before enabling the normal
 deployment workflow. Additional clients use separate Service Tokens so they can
 be authorized, rotated, and revoked independently.
 
+## Production bootstrap
+
+Production starts with one dedicated Service Token and no human identities. Use
+the generated `edgeflags-prod.<workers-subdomain>.workers.dev` hostname and keep
+all bootstrap resources within the account's current free allowances.
+
+Before enabling either production workflow:
+
+1. Create `edgeflags-terraform-state-prod` with
+   `make infra-state-bootstrap ENV=prod` and create independent bucket-scoped
+   credentials for planning, deployment state, and backup maintenance.
+2. Create `edgeflags-prod-smoke` from a trusted terminal with
+   `make access-token-create ENV=prod`. Store its resource ID separately from
+   its Client ID and one-time Client Secret.
+3. Create `prod-plan` with `TERRAFORM_STATE_ACCESS_KEY_ID`,
+   `TERRAFORM_STATE_SECRET_ACCESS_KEY`, and a read-only
+   `CLOUDFLARE_PLAN_API_TOKEN`.
+4. Create `prod`, restrict its deployment branch policy to `main`, and configure
+   the state credentials,
+   `R2_BACKUP_ACCESS_KEY_ID`, `R2_BACKUP_SECRET_ACCESS_KEY`,
+   `CLOUDFLARE_DEPLOY_API_TOKEN`, `AUTHORIZATION_POLICY`, `ACCESS_CLIENT_ID`, and
+   `ACCESS_CLIENT_SECRET`.
+5. Configure `PROD_ACCESS_HOSTNAME`, `PROD_ACCESS_ISSUER`,
+   `PROD_ACCESS_SERVICE_TOKEN_IDS`, and `PROD_BASE_URL`. The authorization policy
+   grants the one `service:<client-id>` principal `flags:read`, `flags:write`,
+   and `flags:evaluate`.
+6. Validate current R2, Workers, KV, and Access free allowances, then set
+   `PROD_R2_STATE_ENABLED=true`. Set `PROD_CD_ENABLED=true` only after reviewing
+   the production plan and completing the state lock and restore exercises.
+
+Neither workflow creates GitHub environments, credentials, Service Tokens, or
+required-reviewer rules. These are explicit account and repository bootstrap
+operations.
+
 ## Promotion requirements
 
 Before promotion to `main`:
 
 - required CI checks must pass,
 - infrastructure changes must have a reviewed plan,
-- required secrets and environment approvals must be configured,
+- required secrets and the manual production trigger must be configured,
 - migrations or compatibility concerns must be documented, and
 - smoke-test expectations must be known.
 
-The exact GitHub protection rules and deployment approval policy are not
-configured by the repository and must not be assumed to exist.
+The repository's private GitHub plan does not support required environment
+reviewers. Manual dispatch from `main`, the environment branch policy, and
+`PROD_CD_ENABLED` form the production authorization gate.
 
 ## Credentials and permissions
 
@@ -185,18 +240,19 @@ CI/CD credentials should:
 - avoid plaintext Terraform variables and state exposure, and
 - support rotation without changing application code.
 
-`dev-plan` uses bucket-scoped R2 credentials and a read-only Cloudflare plan
-token. `dev` uses its own R2 credentials, a Cloudflare infrastructure/deployment
-token, and a separate R2 backup token. `CLOUDFLARE_ACCOUNT_ID` and `DEV_BASE_URL`
-are non-secret environment variables. No production deployment credentials are
-configured during this iteration.
+`dev-plan` and `prod-plan` use environment-specific bucket-scoped R2 credentials
+and read-only Cloudflare plan tokens. `dev` and `prod` use isolated R2 state,
+Cloudflare infrastructure/deployment, R2 backup, and Access Service Token
+credentials. `CLOUDFLARE_ACCOUNT_ID` and environment base URLs are non-secret.
+Production bootstrap is not complete merely because the workflow files exist.
 
 When Access is enabled, the plan token also needs Access Apps and Policies Read,
 and the deployment token needs Access Apps and Policies Write. Service Token
 credentials remain separate from Cloudflare API tokens and R2 credentials.
 
-Production deployment should use a protected GitHub environment if that feature
-fits the selected repository plan.
+Production deployment requires the `prod` environment to accept only `main`.
+Required reviewers can replace or supplement manual dispatch if a future GitHub
+plan supports them.
 
 ## Failure and recovery
 

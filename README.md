@@ -11,13 +11,15 @@ observability, and site reliability engineering.
 
 ## Current status
 
-Phases 1 through 6 and Phase 8 API security are complete, while development
-delivery from Phase 7 is operational and production delivery remains pending.
-The repository
-contains a reproducible development toolchain, a local and remotely validated
+Phases 1 through 6 and Phase 8 API security are complete. Development delivery
+from Phase 7 is operational, and the protected production workflow is implemented
+but remains disabled until its free-tier bootstrap and remote validation complete.
+The repository contains a reproducible development toolchain, a local and remotely validated
 KV-backed Worker, Terragrunt composition for distinct `dev` and `prod`
 infrastructure, credential-free pull request validation, environment-scoped
-remote plans, and automatic development deployment with remote smoke tests.
+remote plans, automatic development deployment with remote smoke tests, and a
+production promotion path guarded by a separate plan environment and a manual
+dispatch restricted to `main`.
 
 The remaining infrastructure and broader architecture described in the
 documentation are target outcomes. They will become available incrementally as
@@ -103,7 +105,9 @@ generator used for deployment, the Worker HTTP lifecycle, and an isolated local
 KV implementation. They never contact Cloudflare. The remote development path
 is automated with R2 state backup, exact-plan apply, Worker deployment, Access
 authentication, and a post-deployment smoke test.
-The initial product scope is intentionally small: create, read, delete, and
+The production path uses the same sequence but cannot be activated until its
+isolated R2 state, Access Service Token, GitHub environments, and credentials are
+bootstrapped and reviewed. The initial product scope is intentionally small: create, read, delete, and
 evaluate boolean feature flags. Later phases add security, deterministic
 rollouts, targeting, interoperability, and operational experiments.
 
@@ -157,6 +161,7 @@ make infra-check
 make infra-plan ENV=dev
 make infra-plan ENV=prod
 make access-token-create ENV=dev
+make access-token-create ENV=prod
 make access-token-rotate ENV=dev
 make access-validate ENV=dev BASE_URL=https://...
 make pre-commit
@@ -179,8 +184,9 @@ Git allows contributors to skip.
 - Development branches merge into `develop` through pull requests.
 - `develop` is the integration branch for ongoing work.
 - `main` contains the stable state of the project.
-- Promoting `develop` to `main` represents a production release and will trigger
-  production deployment once continuous delivery is implemented.
+- Promoting `develop` to `main` prepares a production release. Once
+  `PROD_CD_ENABLED=true` is deliberately configured, an operator starts the
+  production workflow manually from `main`.
 
 See [Delivery](docs/DELIVERY.md) for the complete target workflow.
 

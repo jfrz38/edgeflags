@@ -8,7 +8,9 @@ phase list.
 EdgeFlags has completed **Phases 1 through 6 and Phase 8**. Phase 7's development
 delivery path is operational: merges to `develop` back up remote state, apply the
 reviewed plan, deploy the Worker, and pass an authenticated remote smoke test.
-Production delivery is the remaining Phase 7 work now that the API is protected.
+The protected production workflow and pre-merge production plan are implemented.
+Production bootstrap, state recovery exercises, and a successful manually started
+promotion remain before Phase 7 can be completed.
 
 ## Planning model
 
@@ -241,9 +243,11 @@ against a newly deployed release.
 
 Development CD, environment-scoped remote plans, R2 state backups, exact-plan
 apply, Worker deployment, and smoke tests are active and have completed
-successfully. Production deployment can proceed now that Phase 8 protects the
-public API. Remaining state recovery exercises are operational hardening rather
-than a blocker for API security.
+successfully. Production automation now provides a separate least-privilege plan,
+manual dispatch from `main`, enforced Access configuration, and a smoke
+test that proves protected routes fail closed. It remains disabled until the
+isolated production state, credentials, 30-day backup retention, lock and restore
+exercises, and first authorized promotion are validated remotely.
 
 ### Objective
 

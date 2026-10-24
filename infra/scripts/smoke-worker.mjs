@@ -63,6 +63,7 @@ export async function smokeWorker({
     new Promise((resolve) => setTimeout(resolve, milliseconds)),
   accessClientId,
   accessClientSecret,
+  requireAccess = false,
 } = {}) {
   const rootUrl = assertBaseUrl(baseUrl);
   const authenticationHeaders = accessHeaders(accessClientId, accessClientSecret);
@@ -73,7 +74,7 @@ export async function smokeWorker({
 
   try {
     const healthResponse = await fetchRequest(rootUrl, {
-      headers: authenticationHeaders,
+      headers: {},
     });
     const health = await responseJson(healthResponse, "Health check");
     if (
@@ -82,6 +83,15 @@ export async function smokeWorker({
       health.status !== "ok"
     ) {
       throw new Error(`Health check failed with status ${healthResponse.status}`);
+    }
+
+    if (requireAccess) {
+      const unauthenticatedResponse = await fetchRequest(flagUrl);
+      if (unauthenticatedResponse.status !== 401) {
+        throw new Error(
+          `Unauthenticated protected request returned ${unauthenticatedResponse.status} instead of 401`,
+        );
+      }
     }
 
     cleanupRequired = true;
@@ -160,6 +170,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     baseUrl: process.env.BASE_URL,
     accessClientId: process.env.ACCESS_CLIENT_ID,
     accessClientSecret: process.env.ACCESS_CLIENT_SECRET,
+    requireAccess: process.env.REQUIRE_ACCESS === "true",
   });
   console.log(`Remote smoke test passed and cleaned up flag ${key}`);
 }

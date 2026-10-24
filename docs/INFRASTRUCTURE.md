@@ -42,7 +42,7 @@ Development and production use separate `edgeflags-terraform-state-dev` and
 lockfiles. The endpoint uses `CLOUDFLARE_ACCOUNT_ID`; R2 credentials use
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 
-Automated development backups use separate bucket-scoped S3 credentials exposed
+Automated environment backups use separate bucket-scoped S3 credentials exposed
 as `R2_BACKUP_ACCESS_KEY_ID` and `R2_BACKUP_SECRET_ACCESS_KEY`. The backup upload
 uses R2's S3-compatible API because bucket-scoped Object Read & Write tokens are
 not supported by the Cloudflare REST API used by `wrangler r2 object put`.
@@ -63,14 +63,62 @@ Before migration, `make infra-state-backup-local` copies development's ignored
 local state into an ignored timestamped backup. `make infra-state-migrate` uses
 Terraform's supported backend migration. Development state has been migrated;
 clean GitHub runners now plan and deploy against R2. Lock and recovery exercises
-remain documented hardening follow-up.
+are required before production activation.
 
 R2 does not provide the state-version history assumed by some S3 workflows.
-`make infra-state-backup` therefore uploads the current development state to a
+`make infra-state-backup` therefore uploads the current environment state to a
 timestamped object under the bucket's `backups/` prefix. CD stops before planning
 or applying if this backup fails. The state pull uses the backend credentials;
-only the upload receives the dedicated backup credentials. Backup objects require
-explicit retention.
+only the upload receives the dedicated backup credentials. The command safely
+skips copying when a first deployment has no state object and deletes backup
+objects older than 30 days.
+
+### Lock and restore exercise
+
+Complete this controlled exercise against development before enabling production
+delivery. Disable development CD temporarily and ensure no other operator is
+running Terraform. In one trusted terminal, initialize development and run a
+refresh-only apply directly through Terragrunt, stopping at its confirmation
+prompt without approving it:
+
+```bash
+make infra-init ENV=dev
+mise exec -- terragrunt --working-dir infra/live/dev run --tf-path terraform -- apply -refresh-only
+```
+
+While that prompt owns the lock, run a development plan with a short lock timeout
+from a second terminal. It must fail because the first operation owns the R2
+lockfile:
+
+```bash
+mise exec -- terragrunt --working-dir infra/live/dev run --tf-path terraform -- plan -lock-timeout=5s
+```
+
+Cancel the first command rather than approving it, then verify a normal plan can
+acquire the released lock. Do not use `force-unlock` unless the owning process is
+known to be gone and its lock identifier has been inspected.
+
+For recovery, first run `make infra-state-backup ENV=dev`, record the resulting
+object key, and download that exact object to a private temporary file using the
+documented backup credentials. Compare its SHA-256 checksum with a fresh
+`terraform state pull`. When they match and CD remains disabled, push the
+unchanged backup from a trusted terminal with Terraform's explicit
+`state push -force` recovery command. Pull state again, verify the checksum, and
+review a new plan for unexpected actions before deleting the temporary file and
+reenabling CD. Never commit the file, print its contents, perform this exercise
+through CI, or restore an older serial without separately reviewing every
+intervening infrastructure change.
+
+The recovery write is intentionally not a Make target. After validating the
+selected private file, invoke the explicit provider command:
+
+```bash
+mise exec -- terragrunt --working-dir infra/live/dev run --tf-path terraform -- state push -force <private-backup-file>
+```
+
+Record timestamps, sanitized lock errors, checksums, backup object keys, and plan
+action counts in EXP-0003. Recheck R2 account usage afterwards; do not activate
+production if the exercise or 30-day retention would leave the free allowance.
 
 ## Credential-free tests
 
@@ -140,8 +188,9 @@ further operations of an exhausted type fail.
 Cloudflare's published R2 Standard free tier checked on 2026-10-15 includes 10
 GB-month of storage, one million Class A operations, ten million Class B
 operations, and free egress each month. Terraform state and bounded timestamped
-backups are expected to use a negligible fraction of those allowances, but
-backup retention must still be configured and usage observed. The free tier does
+backups are expected to use a negligible fraction of those allowances. Each
+deployment removes backup objects older than 30 days; usage must still be
+observed. The free tier does
 not apply to R2 Infrequent Access storage, so state buckets use Standard storage.
 Source: [R2 pricing](https://developers.cloudflare.com/r2/pricing/).
 
@@ -159,7 +208,8 @@ inventory does not itself exceed the listed storage or operation allowances.
 Actual traffic from both environments shares the Workers and KV allowances. The
 development apply and production plan were reviewed against the target account
 on 2026-10-15 and fit the listed allowances. Development R2 state and backups are
-active; retention and measured usage remain follow-up. Recheck current pricing
+active. Production activation requires a fresh allowance and account-usage check
+before bootstrap. Recheck current pricing
 and account consumption before every first environment apply.
 
 ## Commands
@@ -181,21 +231,28 @@ make infra-show ENV=dev
 make infra-plan ENV=prod
 make infra-show ENV=prod
 
-# Development-only mutation and recovery preparation
+# State backup and exact-plan apply (production requires Access enabled)
+make infra-state-backup ENV=prod
+make infra-apply ENV=prod
+
+# Development-only migration and destruction
 make infra-state-backup-local ENV=dev
 make infra-state-migrate ENV=dev
 make infra-state-backup ENV=dev
 make infra-apply ENV=dev
 make infra-destroy ENV=dev
 
-# Development Access bootstrap; run only from a trusted terminal
+# Access bootstrap; run only from a trusted terminal
 make access-token-create ENV=dev
 make access-token-rotate ENV=dev
+make access-token-create ENV=prod
+make access-token-rotate ENV=prod
 ```
 
 Saved plans, pre-migration local state, local backups, generated backends,
-provider directories, and Terragrunt caches are ignored. Production apply,
-destroy, deployment, and smoke tests are intentionally blocked by Make.
+provider directories, and Terragrunt caches are ignored. Production destroy is
+intentionally blocked by Make; apply, deployment, and smoke require the protected
+production configuration described in [Delivery](DELIVERY.md).
 
 `make infra-check` includes `make infra-test`; the separate test target is useful
 when iterating on the shared Terraform root. Pull request CI runs

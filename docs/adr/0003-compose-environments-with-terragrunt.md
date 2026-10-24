@@ -78,7 +78,7 @@ single-operator local iteration.
 ## Follow-up
 
 - Select a shared state backend before CI/CD or multi-operator applies.
-- Add production mutation only with the Phase 7 approval and promotion model.
+- Add production mutation only with the Phase 7 authorization and promotion model.
 - Revalidate Cloudflare pricing and limits before the first remote apply.
 
 [ADR 0004](0004-store-terraform-state-in-cloudflare-r2.md) implements the shared
