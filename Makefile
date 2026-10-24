@@ -62,12 +62,15 @@ check: ## Run application and infrastructure checks
 	$(MAKE) infra-check
 	$(MAKE) security
 
-.PHONY: check-infra-env check-mutable-infra-env check-state-env check-state-backup-env check-cloudflare-account check-cloudflare-token
+.PHONY: check-infra-env check-mutable-infra-env check-development-env check-state-env check-state-backup-env check-cloudflare-account check-cloudflare-token
 check-infra-env:
 	@if [ "$(ENV)" != "dev" ] && [ "$(ENV)" != "prod" ]; then printf '%s\n' "ENV must be one of: $(INFRA_ENVIRONMENTS)"; exit 1; fi
 
 check-mutable-infra-env: check-infra-env
-	@if [ "$(ENV)" != "dev" ]; then printf '%s\n' "Mutable infrastructure commands are limited to ENV=dev"; exit 1; fi
+	@if [ "$(ENV)" = "prod" ] && [ "$$ACCESS_ENABLED" != "true" ]; then printf '%s\n' "Production mutations require ACCESS_ENABLED=true"; exit 1; fi
+
+check-development-env: check-infra-env
+	@if [ "$(ENV)" != "dev" ]; then printf '%s\n' "This destructive or migration command is limited to ENV=dev"; exit 1; fi
 
 check-state-env: check-infra-env
 	@if [ -z "$$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$$AWS_ACCESS_KEY_ID" ] || [ -z "$$AWS_SECRET_ACCESS_KEY" ]; then printf '%s\n' "CLOUDFLARE_ACCOUNT_ID, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY are required for remote state"; exit 1; fi
@@ -116,64 +119,59 @@ infra-plan-summary: check-infra-env ## Write a secret-safe Markdown summary of t
 infra-show: check-infra-env ## Show the saved plan for ENV
 	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- show "$(abspath infra/live/$(ENV)/edgeflags-$(ENV).tfplan)"
 
-infra-apply: check-mutable-infra-env ## Apply the reviewed development plan
-	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- apply "$(abspath infra/live/dev/edgeflags-dev.tfplan)"
+infra-apply: check-mutable-infra-env ## Apply the saved plan for ENV (dev or protected prod)
+	@test -f "infra/live/$(ENV)/edgeflags-$(ENV).tfplan" || { printf '%s\n' "No saved plan exists for ENV=$(ENV)"; exit 1; }
+	$(TERRAGRUNT) --working-dir "infra/live/$(ENV)" run --tf-path terraform -- apply "$(abspath infra/live/$(ENV)/edgeflags-$(ENV).tfplan)"
 
-infra-destroy: check-mutable-infra-env ## Destroy development resources after confirmation
+infra-destroy: check-development-env ## Destroy development resources after confirmation
 	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- destroy
 
 .PHONY: configure-worker configure-worker-secret deploy smoke access-validate access-token-create access-token-rotate access-token-delete
 configure-worker: check-infra-env ## Generate ignored Wrangler configuration for ENV
 	$(MISE) exec -- node infra/scripts/configure-worker.mjs "$(ENV)"
 
-configure-worker-secret: check-mutable-infra-env configure-worker ## Install the development authorization policy when Access is enabled
+configure-worker-secret: check-mutable-infra-env configure-worker ## Install the authorization policy for ENV when Access is enabled
 	@if [ "$$ACCESS_ENABLED" = "true" ]; then \
 		test -n "$$AUTHORIZATION_POLICY" || { printf '%s\n' "AUTHORIZATION_POLICY is required when Access is enabled"; exit 1; }; \
-		printf '%s' "$$AUTHORIZATION_POLICY" | $(MISE) exec -- pnpm --dir app exec wrangler secret put AUTHORIZATION_POLICY --env dev --config wrangler.dev.toml; \
+		printf '%s' "$$AUTHORIZATION_POLICY" | $(MISE) exec -- pnpm --dir app exec wrangler secret put AUTHORIZATION_POLICY --env "$(ENV)" --config "wrangler.$(ENV).toml"; \
 	else \
 		printf '%s\n' "Access is disabled; authorization policy secret unchanged"; \
 	fi
 
-deploy: check-mutable-infra-env configure-worker-secret ## Deploy the development Worker with its provisioned KV binding
+deploy: check-mutable-infra-env configure-worker-secret ## Deploy the Worker for ENV with its provisioned KV binding
 	$(MISE) exec -- pnpm --dir app exec wrangler deploy --env "$(ENV)" --config "wrangler.$(ENV).toml"
 
-smoke: check-mutable-infra-env ## Exercise health and a disposable flag against BASE_URL
+smoke: check-mutable-infra-env ## Exercise health and a disposable flag against BASE_URL for ENV
 	@if [ -z "$(BASE_URL)" ]; then printf '%s\n' "BASE_URL is required"; exit 1; fi
 	@if [ "$$ACCESS_ENABLED" = "true" ] && { [ -z "$$ACCESS_CLIENT_ID" ] || [ -z "$$ACCESS_CLIENT_SECRET" ]; }; then printf '%s\n' "ACCESS_CLIENT_ID and ACCESS_CLIENT_SECRET are required when Access is enabled"; exit 1; fi
-	BASE_URL="$(BASE_URL)" $(MISE) exec -- node infra/scripts/smoke-worker.mjs
+	@if [ "$(ENV)" = "prod" ]; then REQUIRE_ACCESS=true; else REQUIRE_ACCESS="$${REQUIRE_ACCESS:-false}"; fi; \
+	BASE_URL="$(BASE_URL)" REQUIRE_ACCESS="$$REQUIRE_ACCESS" $(MISE) exec -- node infra/scripts/smoke-worker.mjs
 
-access-validate: check-mutable-infra-env ## Validate remote Access authentication and limited read authorization
+access-validate: check-development-env ## Validate development Access authentication and limited read authorization
 	@if [ -z "$(BASE_URL)" ]; then printf '%s\n' "BASE_URL is required"; exit 1; fi
 	@if [ -z "$$ACCESS_CLIENT_ID" ] || [ -z "$$ACCESS_CLIENT_SECRET" ] || [ -z "$$LIMITED_ACCESS_CLIENT_ID" ] || [ -z "$$LIMITED_ACCESS_CLIENT_SECRET" ]; then printf '%s\n' "Full-scope and limited-scope Access credentials are required"; exit 1; fi
 	BASE_URL="$(BASE_URL)" $(MISE) exec -- node infra/scripts/validate-access-authorization.mjs
 
-access-token-create: check-mutable-infra-env check-cloudflare-account check-cloudflare-token ## Create a development Access Service Token outside Terraform state
+access-token-create: check-infra-env check-cloudflare-account check-cloudflare-token ## Create an Access Service Token for ENV outside Terraform state
 	$(MISE) exec -- node infra/scripts/manage-access-service-token.mjs create "$(ENV)"
 
-access-token-rotate: check-mutable-infra-env check-cloudflare-account check-cloudflare-token ## Rotate the development Access Service Token with a 24-hour overlap
+access-token-rotate: check-infra-env check-cloudflare-account check-cloudflare-token ## Rotate an Access Service Token for ENV with a 24-hour overlap
 	$(MISE) exec -- node infra/scripts/manage-access-service-token.mjs rotate "$(ENV)"
 
-access-token-delete: check-mutable-infra-env check-cloudflare-account check-cloudflare-token ## Delete a development Access Service Token by resource ID
+access-token-delete: check-infra-env check-cloudflare-account check-cloudflare-token ## Delete an Access Service Token for ENV by resource ID
 	$(MISE) exec -- node infra/scripts/manage-access-service-token.mjs delete "$(ENV)"
 
 infra-state-bootstrap: check-infra-env check-cloudflare-account check-cloudflare-token ## Create the R2 state bucket for ENV (one-time bootstrap)
 	$(MISE) exec -- pnpm --dir app exec wrangler r2 bucket create "edgeflags-terraform-state-$(ENV)"
 
-infra-state-backup-local: check-mutable-infra-env ## Copy the pre-migration local development state to an ignored backup
+infra-state-backup-local: check-development-env ## Copy the pre-migration local development state to an ignored backup
 	@test -f "infra/live/dev/terraform.tfstate" || { printf '%s\n' "No local development state exists"; exit 1; }
 	@mkdir -p "infra/live/dev/state-backups"
 	@cp "infra/live/dev/terraform.tfstate" "infra/live/dev/state-backups/pre-r2-$$(date -u +%Y%m%dT%H%M%SZ).tfstate"
 
-infra-state-migrate: check-mutable-infra-env check-state-env ## Migrate the existing development state to R2
+infra-state-migrate: check-development-env check-state-env ## Migrate the existing development state to R2
 	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- init -migrate-state
 
-infra-state-backup: check-mutable-infra-env check-state-env check-state-backup-env ## Snapshot remote development state to a timestamped R2 object
-	@$(MAKE) infra-init ENV=dev
-	@tmp_file=$$(mktemp); trap 'rm -f "$$tmp_file"' EXIT; \
-	$(TERRAGRUNT) --working-dir infra/live/dev run --tf-path terraform -- state pull > "$$tmp_file" && \
-	RCLONE_S3_PROVIDER=Cloudflare \
-	RCLONE_S3_ACCESS_KEY_ID="$$R2_BACKUP_ACCESS_KEY_ID" \
-	RCLONE_S3_SECRET_ACCESS_KEY="$$R2_BACKUP_SECRET_ACCESS_KEY" \
-	RCLONE_S3_ENDPOINT="https://$$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com" \
-	$(RCLONE) copyto "$$tmp_file" ":s3:edgeflags-terraform-state-dev/backups/$$(date -u +%Y%m%dT%H%M%SZ).tfstate" \
-		--s3-no-check-bucket
+infra-state-backup: check-infra-env check-state-env check-state-backup-env ## Back up state for ENV and delete backups older than 30 days
+	@$(MAKE) infra-init ENV=$(ENV)
+	@$(MISE) exec -- node infra/scripts/manage-state-backups.mjs "$(ENV)"

@@ -299,10 +299,86 @@ test("authenticates every request with a Cloudflare Access service token", async
     sleep: async () => {},
   });
 
-  for (const { headers } of scriptedFetch.requests) {
+  assert.equal(scriptedFetch.requests[0].headers.has("CF-Access-Client-Id"), false);
+  for (const { headers } of scriptedFetch.requests.slice(1)) {
     assert.equal(headers.get("CF-Access-Client-Id"), "client-id");
     assert.equal(headers.get("CF-Access-Client-Secret"), "client-secret");
   }
+});
+
+test("requires Access to reject an unauthenticated protected request", async () => {
+  const scriptedFetch = createScriptedFetch([
+    {
+      method: "GET",
+      path: "/",
+      response: jsonResponse({ service: "edgeflags", status: "ok" }),
+    },
+    {
+      method: "GET",
+      path: "/flags/smoke-protected",
+      response: new Response(null, { status: 401 }),
+    },
+    {
+      method: "PUT",
+      path: "/flags/smoke-protected",
+      response: jsonResponse({}, 201),
+    },
+    {
+      method: "GET",
+      path: "/flags/smoke-protected",
+      response: jsonResponse({ key: "smoke-protected", enabled: true }),
+    },
+    {
+      method: "GET",
+      path: "/evaluate/smoke-protected",
+      response: jsonResponse({ key: "smoke-protected", value: true }),
+    },
+    {
+      method: "DELETE",
+      path: "/flags/smoke-protected",
+      response: new Response(null, { status: 204 }),
+    },
+  ]);
+
+  await smokeWorker({
+    baseUrl: "https://prod.example.test",
+    key: "smoke-protected",
+    accessClientId: "client-id",
+    accessClientSecret: "client-secret",
+    requireAccess: true,
+    fetch: scriptedFetch.fetch,
+    sleep: async () => {},
+  });
+
+  scriptedFetch.assertComplete();
+});
+
+test("fails before mutation when production Access is not enforced", async () => {
+  const scriptedFetch = createScriptedFetch([
+    {
+      method: "GET",
+      path: "/",
+      response: jsonResponse({ service: "edgeflags", status: "ok" }),
+    },
+    {
+      method: "GET",
+      path: "/flags/smoke-unprotected",
+      response: jsonResponse({ error: { code: "FLAG_NOT_FOUND" } }, 404),
+    },
+  ]);
+
+  await assert.rejects(
+    smokeWorker({
+      baseUrl: "https://prod.example.test",
+      key: "smoke-unprotected",
+      accessClientId: "client-id",
+      accessClientSecret: "client-secret",
+      requireAccess: true,
+      fetch: scriptedFetch.fetch,
+    }),
+    /instead of 401/,
+  );
+  scriptedFetch.assertComplete();
 });
 
 test("rejects an incomplete Access service token", async () => {

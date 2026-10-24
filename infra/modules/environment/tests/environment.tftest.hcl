@@ -84,3 +84,26 @@ run "plans_access_protection_with_mock_provider" {
     error_message = "Access must protect management and evaluation without covering the public health root."
   }
 }
+
+run "plans_production_access_protection" {
+  command = plan
+
+  variables {
+    cloudflare_account_id = "0123456789abcdef0123456789abcdef"
+    environment           = "prod"
+    flags_kv_title        = "edgeflags-prod-flags"
+    access_enabled        = true
+    access_hostname       = "edgeflags-prod.example.workers.dev"
+    access_service_token_ids = [
+      "12345678-1234-1234-1234-123456789abc"
+    ]
+  }
+
+  assert {
+    condition = tolist(output.access_protected_paths) == tolist([
+      "edgeflags-prod.example.workers.dev/flags/*",
+      "edgeflags-prod.example.workers.dev/evaluate/*"
+    ])
+    error_message = "Production Access must protect management and evaluation without covering the public health root."
+  }
+}
