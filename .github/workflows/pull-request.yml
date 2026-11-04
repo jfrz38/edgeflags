@@ -80,6 +80,7 @@ jobs:
     name: Development plan
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
       vars.R2_STATE_ENABLED == 'true'
     needs: infrastructure
     runs-on: ubuntu-latest
@@ -121,6 +122,7 @@ jobs:
     if: >-
       github.base_ref == 'main' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
       vars.PROD_R2_STATE_ENABLED == 'true'
     needs: infrastructure
     runs-on: ubuntu-latest
