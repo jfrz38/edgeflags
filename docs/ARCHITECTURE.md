@@ -118,17 +118,24 @@ these current constraints:
 - infrastructure may depend on infrastructure, application, and domain;
 - the `infrastructure/auth`, `infrastructure/http`, and
   `infrastructure/persistence` modules must not import one another; composition
-  between them belongs in the Worker entrypoint; and
+  between them belongs in the Worker entrypoint;
 - domain and application must not import `cloudflare:workers`, Wrangler modules
-  or types, or Node built-in modules.
+  or types, Node built-in modules, or ambient runtime types;
+- concrete application use cases expose one public method named `dispatch`;
+- public reusable classes, interfaces, and type aliases have separate files;
+- application repository ports are interfaces and persistence repositories
+  explicitly implement a port;
+- each operation-specific HTTP handler depends on at most one application
+  module; and
+- production imports remain free of dependency cycles.
 
 `app/clean-architecture.json` and Clean Architecture Highlighter CLI protect the
-three primary layers. ArchUnitTS protects the sibling infrastructure modules and
-the core's independence from runtime-specific modules. The architecture suite
-also runs the CLI against temporary invalid projects, so a configuration or
-scope regression cannot silently leave the check green. Run the complete gate
-with `make architecture`; it is also part of `make check` and the pull-request
-Application job.
+three primary layers. ArchUnitTS protects dependency relationships and cycles,
+while Oxc AST rules protect source-shape conventions and ambient runtime
+independence. The architecture suite also runs each rule against temporary
+invalid projects, so a configuration or scope regression cannot silently leave
+the check green. Run the complete gate with `make architecture`; it is also part
+of `make check` and the pull-request Application job.
 
 Tests under `app/test` are intentionally outside the analyzed production tree.
 Integration tests legitimately import Cloudflare's test runtime, Node types, and

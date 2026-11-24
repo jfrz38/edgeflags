@@ -23,6 +23,7 @@
     "archunit": "2.5.5",
     "es-module-lexer": "2.3.2",
     "husky": "9.1.7",
+    "oxc-parser": "0.160.0",
     "typescript": "7.0.2",
     "vitest": "5.0.5",
     "wrangler": "4.155.0"

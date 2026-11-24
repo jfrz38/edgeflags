@@ -1,6 +1,5 @@
 import type { AccessScope } from "./access-scope";
-
-export type ClientKind = "user" | "service";
+import type { ClientKind } from "./client-kind";
 
 export type ClientAuthentication = Readonly<{
   principalId: string;
