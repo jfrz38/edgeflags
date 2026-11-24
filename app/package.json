@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@12.8.1",
   "scripts": {
-    "architecture": "clean-arch check . --source-folder src --config clean-architecture.json",
+    "architecture": "vitest run --config vitest.architecture.config.ts",
     "dev": "pnpm run generate-types && wrangler dev",
     "format": "biome format --write .",
     "format-check": "biome format .",
@@ -20,6 +20,8 @@
     "@cloudflare/vitest-plugin": "1.4.10",
     "@jfrz38/clean-architecture-highlighter-cli": "0.1.0",
     "@types/node": "26.6.6",
+    "archunit": "2.5.5",
+    "es-module-lexer": "2.3.2",
     "husky": "9.1.7",
     "typescript": "7.0.2",
     "vitest": "5.0.5",
