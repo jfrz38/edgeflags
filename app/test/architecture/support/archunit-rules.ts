@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { isBuiltin } from "node:module";
 import { dirname, resolve } from "node:path";
 import { projectFiles, type Violation } from "archunit";
-import { ImportType, parse } from "es-module-lexer";
+import { ImportType, init, parse } from "es-module-lexer";
 
 type ImportPredicate = (specifier: string) => boolean;
 
@@ -23,14 +23,16 @@ export function infrastructureIsolationRule(
   ).then((violations) => violations.flat());
 }
 
-export function corePurityRule(
+export async function corePurityRule(
   tsconfig: string,
   isForbidden: ImportPredicate,
   message: string,
 ): Promise<Violation[]> {
+  await init;
+
   const projectRoot = dirname(tsconfig);
 
-  return Promise.all(
+  const violations = await Promise.all(
     ["domain", "application"].map((layer) =>
       projectFiles(tsconfig)
         .inFolder(`src/${layer}/**`)
@@ -44,7 +46,9 @@ export function corePurityRule(
         )
         .check({ clearCache: true }),
     ),
-  ).then((violations) => violations.flat());
+  );
+
+  return violations.flat();
 }
 
 export function isCloudflareWorkersImport(specifier: string): boolean {
