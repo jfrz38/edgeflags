@@ -10,4 +10,8 @@ export default defineConfig({
       },
     }),
   ],
+  test: {
+    exclude: ["test/architecture/**"],
+    include: ["test/**/*.spec.ts"],
+  },
 });

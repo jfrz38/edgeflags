@@ -2,10 +2,8 @@ import {
   isAccessScope,
   type AccessScope,
 } from "../../application/access-scope";
-import type {
-  ClientAuthentication,
-  ClientKind,
-} from "../../application/client-authentication";
+import type { ClientAuthentication } from "../../application/client-authentication";
+import type { ClientKind } from "../../application/client-kind";
 
 type AccessContext = Pick<CloudflareAccessContext, "getIdentity">;
 
